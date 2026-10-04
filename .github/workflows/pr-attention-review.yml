@@ -34,14 +34,14 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Check out pull request for inspection
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
           fetch-depth: 0
@@ -58,7 +58,7 @@ jobs:
 
       - name: Read and authorize pull request context
         id: pr-context
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
@@ -129,7 +129,7 @@ jobs:
 
       - name: Export bounded deterministic evidence
         id: export-evidence
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('node:fs');
@@ -153,14 +153,14 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Check out pull request for inspection
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
           fetch-depth: 0
@@ -168,7 +168,7 @@ jobs:
           path: .par/target
 
       - name: Provide trusted evidence to Codex
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           DETERMINISTIC_JSON: ${{ needs.evidence.outputs.deterministic-json }}
         with:
@@ -207,7 +207,7 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 1
@@ -235,7 +235,7 @@ jobs:
 
       - name: Inspect existing PR attention state
         id: inspect-comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           PAR_DRY_RUN: 'true'
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
@@ -258,7 +258,7 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 1
@@ -300,7 +300,7 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 1
@@ -353,14 +353,14 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check out trusted router from main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Restore finalized classification
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           CLASSIFICATION_JSON: ${{ needs.finalize.outputs.classification-json }}
         with:
@@ -374,7 +374,7 @@ jobs:
             );
 
       - name: Create or update persistent PR comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
         with:
