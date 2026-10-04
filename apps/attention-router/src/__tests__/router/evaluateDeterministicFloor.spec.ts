@@ -44,6 +44,22 @@ describe('evaluateDeterministicFloor', () => {
     expect(result.rationale).toContain('Shared hook or service changed.');
   });
 
+  it('raises operational runbook changes to MEDIUM', () => {
+    const result = evaluateDeterministicFloor(
+      evidence({
+        changedFiles: [
+          {
+            status: 'MODIFIED',
+            path: 'docs/runbooks/pr-attention-notification.md',
+          },
+        ],
+      }),
+    );
+
+    expect(result.floor).toBe('MEDIUM');
+    expect(result.rationale).toContain('Operational runbook changed.');
+  });
+
   it('raises failed validation to MEDIUM', () => {
     const result = evaluateDeterministicFloor(
       evidence({ validationStatus: 'FAILED' }),
