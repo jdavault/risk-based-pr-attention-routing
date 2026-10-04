@@ -1,0 +1,336 @@
+name: PR Attention Review
+
+on:
+  workflow_run:
+    workflows: [Validate repository]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: attention-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  evidence:
+    name: Collect trusted evidence
+    if: >
+      vars.PAR_APP_WORKFLOWS_ENABLED == 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.actor.login == 'jdavault' &&
+      github.event.workflow_run.pull_requests[0].number != null
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      deterministic-json: ${{ steps.export-evidence.outputs.json }}
+      pr-context-json: ${{ steps.pr-context.outputs.context }}
+
+    steps:
+      - name: Check out trusted router from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pull request for inspection
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: .par/target
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/attention-router/package-lock.json
+
+      - name: Install trusted router dependencies
+        run: npm ci --prefix apps/attention-router
+
+      - name: Read and authorize pull request context
+        id: pr-context
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.PAR_PR_NUMBER);
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: number,
+            });
+
+            if (pullRequest.user.login !== 'jdavault') {
+              throw new Error('The POC accepts only jdavault-authored pull requests.');
+            }
+
+            if (pullRequest.head.sha !== process.env.EXPECTED_HEAD_SHA) {
+              throw new Error('The pull request changed after validation; wait for the next run.');
+            }
+
+            const body = pullRequest.body ?? '';
+            const jiraReference = `${pullRequest.title}\n${body}`.match(
+              /\b[A-Z][A-Z0-9]+-\d+\b/u,
+            )?.[0] ?? '';
+
+            const prContext = {
+              repository: `${context.repo.owner}/${context.repo.repo}`,
+              number,
+              title: pullRequest.title,
+              url: pullRequest.html_url,
+            };
+
+            core.setOutput('title', pullRequest.title);
+            core.setOutput('body', body);
+            core.setOutput('jira-reference', jiraReference);
+            core.setOutput(
+              'material-context',
+              body.trim().length >= 40 ? 'SUFFICIENT' : 'MISSING',
+            );
+            core.setOutput('context', JSON.stringify(prContext));
+
+      - name: Collect deterministic evidence
+        env:
+          BASE_SHA: ${{ github.event.workflow_run.pull_requests[0].base.sha }}
+          HEAD_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          PR_TITLE: ${{ steps.pr-context.outputs.title }}
+          PR_BODY: ${{ steps.pr-context.outputs.body }}
+          JIRA_REFERENCE: ${{ steps.pr-context.outputs.jira-reference }}
+          MATERIAL_CONTEXT: ${{ steps.pr-context.outputs.material-context }}
+        run: |
+          jira_arguments=()
+          if [[ -n "$JIRA_REFERENCE" ]]; then
+            jira_arguments=(--jira-reference "$JIRA_REFERENCE")
+          fi
+
+          ./apps/attention-router/node_modules/.bin/tsx \
+            apps/attention-router/scripts/collectPullRequestEvidence.ts \
+            --repository-directory .par/target \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --material-context "$MATERIAL_CONTEXT" \
+            --validation-status PASSED \
+            "${jira_arguments[@]}" > .par/evidence.json
+
+      - name: Export bounded deterministic evidence
+        id: export-evidence
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('node:fs');
+            const evidence = fs.readFileSync('.par/evidence.json', 'utf8');
+
+            if (Buffer.byteLength(evidence, 'utf8') > 400_000) {
+              throw new Error('Deterministic evidence exceeds the POC job-output limit.');
+            }
+
+            core.setOutput('json', evidence);
+
+  classify:
+    name: Classify with Codex
+    needs: evidence
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      ai-classification: ${{ steps.codex.outputs.final-message }}
+
+    steps:
+      - name: Check out trusted router from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pull request for inspection
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: .par/target
+
+      - name: Provide trusted evidence to Codex
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          DETERMINISTIC_JSON: ${{ needs.evidence.outputs.deterministic-json }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            fs.mkdirSync('.par/target', { recursive: true });
+            fs.writeFileSync(
+              '.par/target/evidence.json',
+              process.env.DETERMINISTIC_JSON,
+              'utf8',
+            );
+
+      - name: Run read-only Codex classification
+        id: codex
+        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          safety-strategy: read-only
+          working-directory: .par/target
+          prompt-file: ${{ github.workspace }}/.github/attention-router/classification-prompt.md
+          output-schema-file: ${{ github.workspace }}/.github/attention-router/classification.schema.json
+
+  finalize:
+    name: Finalize attention result
+    needs: [evidence, classify]
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      should-notify: ${{ steps.inspect-comment.outputs.should-notify }}
+      tier: ${{ steps.inspect-comment.outputs.tier }}
+      classification-json: ${{ steps.inspect-comment.outputs.classification-json }}
+
+    steps:
+      - name: Check out trusted router from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/attention-router/package-lock.json
+
+      - name: Install trusted router dependencies
+        run: npm ci --prefix apps/attention-router
+
+      - name: Enforce deterministic floor
+        env:
+          DETERMINISTIC_JSON: ${{ needs.evidence.outputs.deterministic-json }}
+          AI_CLASSIFICATION_JSON: ${{ needs.classify.outputs.ai-classification }}
+        run: |
+          mkdir -p .par
+          ./apps/attention-router/node_modules/.bin/tsx \
+            apps/attention-router/scripts/normalizeClassification.ts \
+            --deterministic-json "$DETERMINISTIC_JSON" \
+            --ai-json "$AI_CLASSIFICATION_JSON" \
+            --output .par/final-classification.json
+
+      - name: Inspect existing PR attention state
+        id: inspect-comment
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          PAR_DRY_RUN: 'true'
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const inspect = require('./.github/scripts/publish-attention.comment.js');
+            await inspect({ github, context, core });
+
+  email:
+    name: Send changed-tier email
+    needs: [evidence, finalize]
+    if: >-
+      needs.finalize.outputs.should-notify == 'true' &&
+      vars.PAR_EMAIL_ENABLED == 'true' &&
+      vars.PAR_EMAIL_PROVIDER == 'resend'
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out trusted router from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/attention-router/package-lock.json
+
+      - name: Install trusted router dependencies
+        run: npm ci --prefix apps/attention-router
+
+      - name: Send attention email
+        env:
+          CLASSIFICATION_JSON: ${{ needs.finalize.outputs.classification-json }}
+          PR_CONTEXT_JSON: ${{ needs.evidence.outputs.pr-context-json }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          PAR_EMAIL_FROM: ${{ vars.PAR_EMAIL_FROM }}
+          PAR_EMAIL_TO_TEAM: ${{ vars.PAR_EMAIL_TO_TEAM }}
+          PAR_EMAIL_TO_LEAD: ${{ vars.PAR_EMAIL_TO_LEAD }}
+        run: |
+          ./apps/attention-router/node_modules/.bin/tsx \
+            apps/attention-router/scripts/sendAttentionEmail.ts \
+            --classification-json "$CLASSIFICATION_JSON" \
+            --pr-context-json "$PR_CONTEXT_JSON"
+
+  publish:
+    name: Publish attention result
+    needs: [finalize, email]
+    if: >
+      always() &&
+      needs.finalize.result == 'success'
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Check out trusted router from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Restore finalized classification
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          CLASSIFICATION_JSON: ${{ needs.finalize.outputs.classification-json }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            fs.mkdirSync('.par', { recursive: true });
+            fs.writeFileSync(
+              '.par/final-classification.json',
+              process.env.CLASSIFICATION_JSON,
+              'utf8',
+            );
+
+      - name: Create or update persistent PR comment
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const publish = require('./.github/scripts/publish-attention.comment.js');
+            await publish({ github, context, core });
