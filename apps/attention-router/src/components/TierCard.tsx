@@ -40,7 +40,7 @@ export function TierCard({
         type="button"
         onClick={() => onSelect(tier)}
       >
-        Filter queue
+        Filter review queue
       </button>
     </article>
   );
