@@ -1,0 +1,130 @@
+.panel {
+  background: #ffffff;
+  border: 1px solid #d9e0ea;
+  border-radius: 1rem;
+  color: #162237;
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.panelHeading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.panelHeading h2 {
+  font-size: 1.5rem;
+  margin: 0.15rem 0 0;
+}
+
+.panelHeading > span {
+  color: #526078;
+  font-size: 0.875rem;
+}
+
+.eyebrow {
+  color: #526078;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.list {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.queueItem {
+  background: #f6f8fb;
+  border: 1px solid #d9e0ea;
+  border-radius: 0.75rem;
+  color: #162237;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 0.45rem;
+  padding: 1rem;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+  width: 100%;
+}
+
+.queueItem:hover {
+  border-color: #64748b;
+  transform: translateY(-1px);
+}
+
+.queueItem[aria-pressed='true'] {
+  border-color: #235fa4;
+  box-shadow: 0 0 0 2px rgb(35 95 164 / 16%);
+}
+
+.queueItem:focus-visible {
+  outline: 3px solid #f05f5a;
+  outline-offset: 2px;
+}
+
+.itemTopLine {
+  align-items: center;
+  color: #526078;
+  display: flex;
+  font-size: 0.75rem;
+  justify-content: space-between;
+}
+
+.tier {
+  background: #d9f6e9;
+  border-radius: 999px;
+  color: #07543a;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.55rem;
+}
+
+.medium {
+  background: #fff0bf;
+  color: #684600;
+}
+
+.high {
+  background: #ffe0e0;
+  color: #8a2020;
+}
+
+.repository,
+.reviewer {
+  color: #526078;
+  font-size: 0.85rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.25rem 0;
+}
+
+.chips > span {
+  background: #e8edf4;
+  border-radius: 0.35rem;
+  color: #35445c;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.45rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queueItem {
+    transition: none;
+  }
+}

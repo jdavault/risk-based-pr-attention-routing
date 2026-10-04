@@ -7,26 +7,22 @@ have been applied. Notification never approves, merges, deploys, releases, or
 modifies pull-request source. A delivery failure must not prevent publication
 of the persistent classification comment.
 
-Email remains disabled while the application is being reconstructed. The
-personal POC will use Resend's HTTPS API instead of an SMTP relay.
+Email remains disabled until an intentional delivery test. The personal POC
+uses the same SMTP transport shape as the work environment, with smtp4dev as a
+local capture server.
 
 ## Configuration
 
 Configure these under **Settings → Secrets and variables → Actions**.
 
-### Secret
-
-| Secret | Purpose |
-| --- | --- |
-| `RESEND_API_KEY` | Project-specific, sending-only Resend credential restricted to the verified POC domain and used only by the email job. |
-
 ### Variables
 
 | Variable | Purpose |
 | --- | --- |
-| `PAR_EMAIL_PROVIDER` | Must equal `resend` before the email job is eligible to run. |
 | `PAR_EMAIL_ENABLED` | Must equal `true` to permit delivery. Any other value keeps delivery off. |
-| `PAR_EMAIL_FROM` | Sender address on a domain verified in Resend. |
+| `SMTP_HOST` | SMTP host reachable from the self-hosted runner; `localhost` for local smtp4dev. |
+| `SMTP_PORT` | SMTP port; `25` for the POC and work-aligned configuration. |
+| `PAR_EMAIL_FROM` | Sender address used in notification messages. |
 | `PAR_EMAIL_TO_TEAM` | Comma-delimited recipients for LOW and MEDIUM classifications. |
 | `PAR_EMAIL_TO_LEAD` | Comma-delimited recipients for HIGH classifications. |
 
@@ -35,15 +31,13 @@ code. Never store API keys or recipient addresses in workflow source or logs.
 
 ## Enablement sequence
 
-1. Keep `PAR_EMAIL_ENABLED` absent or set to `false` while implementing the
-   notification adapter.
-2. Verify the sending domain and `PAR_EMAIL_FROM` address in Resend.
-3. Create a sending-only Resend API key restricted to the verified POC domain,
-   then add it as the `RESEND_API_KEY` repository secret.
-4. Add the provider, sender, and recipient variables.
-5. Run notification unit tests locally with a fake transport; tests must not
-   call Resend.
-6. Set `PAR_EMAIL_ENABLED=true` only for an intentional end-to-end test.
+1. Keep `PAR_EMAIL_ENABLED` absent or set to `false` while configuring SMTP.
+2. Start smtp4dev with SMTP on host port `25` and its web inbox on port `8025`.
+3. Add the SMTP host, port, sender, and recipient variables.
+4. Run notification unit tests locally with a fake transport; tests must not
+   call an SMTP server.
+5. Send one intentional local message and confirm it appears in smtp4dev.
+6. Set `PAR_EMAIL_ENABLED=true` only for an intentional workflow test.
 7. Confirm that workflow logs contain delivery metadata only—never the body,
    recipients, or credential.
 
@@ -65,15 +59,27 @@ explanatory text changes.
 ## Failure behavior
 
 Classification and persistent comment publication do not depend on successful
-email delivery. A Resend failure must be reported in the email job and workflow
-summary, but the publish job still updates the pull-request comment.
+email delivery. An SMTP failure must be reported in the email job and workflow
+summary, but the publish job still updates the pull-request comment. The final
+publish job records email and Slack job results in `$GITHUB_STEP_SUMMARY`
+without including credentials, recipients, or message bodies.
 
-Use a stable Resend idempotency key derived from the repository, pull-request
-number, and resulting tier marker. Do not retry indefinitely. Any retry policy
-must be bounded and reuse that idempotency key so an accepted request is not
-delivered twice when the client misses the response.
+Include a stable delivery key derived from the repository, pull-request number,
+and resulting tier marker in the SMTP message headers. Do not retry
+indefinitely; SMTP delivery itself does not guarantee provider-side
+idempotency.
 
-## Deferred Slack delivery
+## Slack delivery
 
-Slack remains outside the initial POC. No Slack token, channel identifier, or
-feature flag is required.
+Slack uses a bot token and the Web API `chat.postMessage` method. Configure the
+following under **Settings → Secrets and variables → Actions**:
+
+| Kind | Name | Purpose |
+| --- | --- | --- |
+| Secret | `SLACK_BOT_TOKEN` | Bot user OAuth token with `chat:write`; never expose it in workflow logs. |
+| Variable | `PAR_SLACK_CHANNEL_ID` | Target channel ID; the bot must already be a member. |
+| Variable | `PAR_SLACK_ENABLED` | Must equal `true` to permit Slack delivery. |
+
+Slack follows the same change-only behavior as email: send on the first
+classification or when the tier changes, not on a same-tier update. Keep
+`PAR_SLACK_ENABLED=false` until an intentional workflow test.

@@ -32,7 +32,10 @@ V1 will be a PR Attention Router that classifies and notifies only.
 - Allow AI judgment to raise the attention level when context warrants it, but never lower a deterministic minimum.
 - Publish enough rationale, blast-radius information, reviewer focus, recommended reviewer type, and missing evidence for a human to decide what to inspect.
 - Keep approval, merge, deployment, and release decisions under human control.
-- Limit the initial V1 writes to its persistent PR classification comment and email attention notifications; Slack remains a deferred notification channel, and V1 must not modify repository source.
+- Limit V1 writes to its persistent PR classification comment, email attention
+  notifications, and Slack attention notifications. Slack uses a bot token in
+  an isolated least-privilege job and follows the same change-only delivery
+  rule as email. V1 must not modify repository source.
 - Run the proof of concept, its workflows, secrets, and test pull requests only in the isolated `risk-based-pr-attention-routing`, `one-seo-par`, and `one-market-par` repositories.
 
 ## Consequences
@@ -43,6 +46,14 @@ V1 will be a PR Attention Router that classifies and notifies only.
 - The router cannot demonstrate time savings from autonomous approval or merging in V1.
 - The deterministic rubric and AI rationale must be evaluated against reviewer feedback and revised as evidence accumulates.
 - Any future authority to approve, merge, deploy, or release requires a new architectural decision.
+
+## Amendment: 2026-10-04
+
+Slack notification moved into the POC scope to match the target work
+environment. This does not expand classification authority: Slack may only
+publish the already-finalized attention result, and a Slack failure cannot
+change the classification or prevent the persistent PR comment from being
+published.
 
 ## Alternatives Considered
 

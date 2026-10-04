@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 
-const tierMarker = /<!-- par-risk-tier:(LOW|MEDIUM|HIGH):(\S+) -->/u;
+const tierMarker = /<!--\s*par:v1 tier=(LOW|MEDIUM|HIGH)\s*-->/u;
 const expectedAutomationAuthors = new Set([
   'github-actions',
   'github-actions[bot]',

@@ -54,7 +54,7 @@ The dashboard currently reads synthetic fixture data from `apps/attention-router
 - `.github/workflows/validate.yml` runs repository validation.
 - `.github/workflows/pr-attention-review.yml` collects evidence, invokes Codex, enforces the floor, publishes the PR result, and sends notifications.
 - `.github/attention-router/` contains the Codex prompt and JSON schema.
-- `.github/scripts/publish-attention-comment.js` manages the single persistent PR comment.
+- `.github/scripts/publish-attention.comment.js` manages the single persistent PR comment.
 - `apps/attention-router/src/scripts/` contains deterministic classification, floor enforcement, and comment-state logic.
 - `apps/attention-router/scripts/` contains the evidence collector, classification normalizer, and email CLI.
 - `apps/attention-router/src/notifications/` contains email configuration and message logic.
@@ -71,11 +71,11 @@ Keep the product behavior and safety boundary unchanged while replacing only Ame
 - use the repository's hosted or public GitHub;
 - store the OpenAI credential only as the repository secret;
 - `OPENAI_API_KEY`; never place it in source, workflow text, output, or logs;
-- use the official `openai/codex-action` with a pinned, reviewed version. Run both the Codex sandbox and the action safety strategy in read-only mode.
+- use the official `openai/codex-action` with the reviewed release tag used by the master workflow. Run both the Codex sandbox and the action safety strategy in read-only mode.
 - keep `actions/checkout` configured with `persist-credentials: false`;
 - give each job explicit least-privilege permissions.
-- remove Amex proxy, certificate, SMTP, runner-label, and internal-action assumptions only when they do not apply to the personal environment.
-- treat email as optional until the Resend adapter is implemented, its sender domain is verified, and an intentional delivery test is approved. Store `RESEND_API_KEY` only as a repository secret.
+- remove Amex proxy, certificate, runner-label, and internal-action assumptions only when they do not apply to the personal environment.
+- use the SMTP notification adapter with smtp4dev on `localhost:25` for local capture; keep email disabled until an intentional delivery test is approved.
 - keep Slack disabled during initial validation to avoid notification noise.
 
 Before selecting action versions or changing action inputs, check the current official action documentation. Do not weaken the read-only boundary merely to make the workflow pass.
@@ -86,6 +86,7 @@ Preserve these invariants:
 
 - Deterministic evidence is collected from the exact PR base and head SHAs.
 - Missing Jira context alone does not prevent LOW when the PR otherwise provides sufficient intent and risk evidence.
+- PR bodies declare `Material context: SUFFICIENT` or `Material context: CONFLICTING`; an absent declaration is `MISSING` and prevents LOW.
 - Missing or conflicting material context prevents LOW.
 - Failed validation, shared/configuration changes, large changes, and sensitive workflow or security changes retain their documented deterministic floors.
 - Schema-invalid AI output fails closed.
