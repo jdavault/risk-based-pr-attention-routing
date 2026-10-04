@@ -5,6 +5,10 @@
 > **v0.1 classifies and notifies only. It does not approve or merge pull
 > requests.**
 
+To add the router to an existing frontend or backend repository, see the
+[installation guide](docs/setup/pr-attention-router-installation.md). The Vite
+dashboard is a reference UI and is not required by an adopting application.
+
 ## Problem
 
 AI increases pull request throughput faster than it increases human
