@@ -111,6 +111,38 @@ the public hostname resolves to an ISP block page, test the SMTP endpoint from
 a GitHub-hosted runner or another network. Do not replace the ngrok hostname
 with the tunnel name.
 
+## Pause and resume the POC
+
+Pause the POC after intentional testing so it cannot consume classification
+API usage or send surprise notifications:
+
+```bash
+gh variable set PAR_EMAIL_ENABLED --body false
+gh variable set PAR_SLACK_ENABLED --body false
+gh variable set PAR_APP_WORKFLOWS_ENABLED --body false
+```
+
+Wait for active runs to finish before changing the variables. Disabling the
+master workflow gate does not cancel a job that has already started.
+
+Resume in stages:
+
+1. Start smtp4dev and any required ngrok tunnels.
+2. Read the live ngrok TCP endpoint and update `SMTP_HOST` and `SMTP_PORT`.
+3. Confirm `PAR_EMAIL_ENABLED=false` and `PAR_SLACK_ENABLED=false`.
+4. Set `PAR_APP_WORKFLOWS_ENABLED=true`.
+5. Run a harmless classification PR and verify the persistent PR comment.
+6. Enable and test one notification channel at a time.
+
+Inspect the non-secret configuration without printing credentials:
+
+```bash
+gh variable list
+```
+
+Do not retrieve or print `OPENAI_API_KEY` or `SLACK_BOT_TOKEN` during startup
+checks.
+
 ## Routing and content
 
 - LOW and MEDIUM route to `PAR_EMAIL_TO_TEAM`.
