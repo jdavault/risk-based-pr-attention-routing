@@ -1,414 +1,347 @@
-# P3 PR Attention Router Backport Design
+# Application-Independent PR Attention Router Design
 
-**Status:** Draft for owner review  
-**Date:** 2026-10-04  
-**Source implementation:** `/Users/davauj2/code/p3-solutions-group/p3sg-website`  
+**Status:** Revised for owner review, 2026-10-04
+**Date:** 2026-10-04
+**Reference implementation:** `/Users/davauj2/code/p3-solutions-group/p3sg-website/tools/pr-attention-router`
 **Target repository:** `/Users/davauj2/code/sandbox/risk-based-pr-attention-routing`
 
 ## Purpose
 
-Backport the reusable lessons from the first real PR Attention Router host into
-the reference proof of concept. The result should make future frontend,
-backend, and monorepo installations smaller, safer, and easier to validate
-without coupling the router runtime to the optional Vite dashboard.
+Separate the PR Attention Router from every application, including this
+repository's Vite dashboard. A frontend, backend, or Turborepo host should be
+able to add the router package, provide repository policy as data, and wire one
+validation workflow without copying a React application.
 
-The design preserves the authority boundary in
-[ADR-0001](../../adr/ADR-0001-route-attention-before-automation.md): the router
-classifies required human attention and publishes notifications only. It may
-not approve, merge, deploy, release, or modify pull-request source.
+The change preserves [ADR-0001](../../adr/ADR-0001-route-attention-before-automation.md):
+the router classifies required human attention and publishes notifications
+only. It may not approve, merge, deploy, release, or modify pull-request
+source.
 
 ## Goals
 
-- Make the persistent PR comment the single detailed classification record.
-- Reduce email and Slack notifications to a stable three-line summary.
-- Close known dependency, workflow-pinning, identity, and prompt-instruction
-  trust gaps.
-- Separate the reusable router runtime from the React/Vite dashboard.
-- Move repository-specific deterministic policy into validated data.
-- Make the workflow trust contract executable and portable between hosts.
-- Preserve the POC as a working reference installation with LOW, MEDIUM, and
-  HIGH end-to-end probes.
+- Put host-neutral runtime, CLIs, prompt, schema, helpers, and tests in
+  `packages/pr-attention-router`.
+- Put this repository's policy, conformance cases, and AI context in the
+  root-level `pr-attention-router` adapter directory.
+- Make the dashboard an ordinary workspace client of
+  `@scope/pr-attention-router`.
+- Express every deterministic path rule as validated policy data.
+- Execute TypeScript CLIs directly with Node 22.18 or newer.
+- Preserve trusted-code and untrusted-PR checkout separation in GitHub Actions.
+- Prove the router checks without installing dashboard dependencies.
 
 ## Non-goals
 
-- Publishing a package to npm or a private registry.
-- Creating the final `packages/pr-attention-router` public API.
-- Supporting fork PRs, bot-authored PRs, or autonomous approval.
-- Copying P3 website-specific Stripe, Netlify, SEO, or operator-console policy.
-- Changing application behavior or removing the dashboard.
+- Publishing the package to npm or a private registry.
+- Supporting fork or bot-authored pull requests in this POC.
+- Adding application-specific rules for paths that do not exist.
+- Granting approval, merge, deployment, or release authority.
+- Turning deferred ideas into V1 rules.
 
-## Chosen delivery approach
-
-Use two pull requests.
-
-1. **Security and lean notifications:** improve the existing layout first so
-   urgent controls can be reviewed independently.
-2. **Reusable package boundary:** move the non-UI runtime into
-   `tools/pr-attention-router`, introduce host policy data and contract CLIs,
-   and leave `apps/attention-router` as an optional dashboard.
-
-A single migration would avoid short-lived file churn but would combine SMTP,
-workflow trust, prompt isolation, package movement, policy behavior, and test
-harness changes in one review. Publishing `packages/pr-attention-router` now
-would define a public interface before the mobile and backend installations
-have validated it.
-
-## PR 1: Security and lean notifications
-
-### Notification contract
-
-The persistent PR comment remains the only detailed rendering of summary,
-rationale, blast radius, review focus, and missing evidence. Email and Slack
-render exactly:
+## Target layout
 
 ```text
-[HIGH] PR #42: test(harness): attention router HIGH probe
-Reviewer: Tech Lead or relevant SME · Floor: HIGH
-https://github.com/<owner>/<repo>/pull/42
+package.json
+package-lock.json
+packages/
+  pr-attention-router/
+    cli/
+    lib/
+    test/
+    package.json
+    tsconfig.json
+    README.md
+pr-attention-router/
+  policy.json
+  policy-cases.json
+  host-context.md
+apps/
+  attention-router/
+    package.json
+    src/
+.github/
+  pull_request_template.md
+  workflows/
 ```
 
-`renderNotificationSummary(classification, pullRequest)` owns this format.
-The email subject is its first line. The body is the full three-line summary.
-Slack receives the same three lines. PR-title mentions are neutralized before
-rendering, and normalized classification output no longer carries a duplicate
-`notificationText` field.
+The root `package.json` is private and declares:
 
-Files changed:
+```json
+{
+  "workspaces": ["apps/*", "packages/*"]
+}
+```
 
-- `apps/attention-router/src/router/renderClassification.ts`
-- `apps/attention-router/src/notifications/emailNotification.ts`
-- `apps/attention-router/src/notifications/slackNotification.ts`
-- `apps/attention-router/scripts/normalizeClassification.ts`
-- notification rendering, email, and Slack tests
+The root lockfile is canonical. A clean router validation job uses an npm
+workspace filter, so only the package's runtime dependencies and TypeScript are
+installed. A separate dashboard job installs the complete workspace.
 
-### SMTP dependency
+## Package boundary
 
-Upgrade `nodemailer` from 6.10.1 to the reviewed 10.x release while retaining
-the existing `createTransport` and `sendMail` adapter boundary. Regenerate the
-lockfile and verify the exact subject and body passed to the fake transport.
+`packages/pr-attention-router` contains no React, Vite, DOM, sample-data, or
+host-policy knowledge. Its package name is `@scope/pr-attention-router`, its
+module type is `module`, and its engine floor is Node 22.18.
 
-Files changed:
+Runtime dependencies are only:
 
-- `apps/attention-router/package.json`
-- `apps/attention-router/package-lock.json`
-- SMTP and email notification tests
+- `nodemailer`
+- `yaml`
 
-### Trusted revision
+TypeScript is the only development tool. Strict type-checking of Node built-ins
+and Nodemailer additionally requires the declaration-only development packages
+`@types/node` and `@types/nodemailer`; the reference P3 package has the same
+requirement. Hand-written ambient shims are rejected because they would weaken
+the reusable package's type boundary merely to reduce the manifest count.
+Package scripts provide:
 
-Every trusted checkout uses:
+- `typecheck`
+- `test`
+- `check`
+- `check:policy`
+- `check:workflow`
+
+The package exports a small source-level workspace API from `lib/index.ts`:
+
+- `RiskTier`
+- `ReviewerType`
+- `FinalClassification`
+- `renderClassificationComment`
+- `renderNotificationSummary`
+
+CLIs run directly through Node's native TypeScript support. Imports include
+`.ts` extensions, the TypeScript configuration enables `erasableSyntaxOnly`,
+and no build artifact is required for the vendored workspace form. A future
+published package must compile JavaScript before distribution.
+
+## Dashboard boundary
+
+`apps/attention-router` declares a workspace dependency on
+`@scope/pr-attention-router`. It imports package-owned risk types and rendering
+instead of defining or copying router behavior. UI-only types, tier labels,
+sample data, React components, CSS, Vitest, and Vite remain in the app.
+
+The dashboard may adapt a synthetic pull request into a
+`FinalClassification` to show a persistent-comment preview. That adapter is
+presentation code; it cannot evaluate a deterministic floor or enforce a tier.
+
+The app no longer contains:
+
+- router CLIs;
+- deterministic rule evaluation;
+- classification enforcement;
+- diff parsing;
+- notification adapters;
+- SMTP or Slack transports;
+- GitHub-script helpers;
+- prompt or output schema.
+
+## Host policy
+
+`pr-attention-router/policy.json` is this repository's adapter. Schema version
+1 contains named MEDIUM and HIGH path rules, Unicode regex sources, rationale,
+production/non-production/test patterns, and size thresholds.
+
+The loader rejects:
+
+- unsupported versions;
+- LOW path rules;
+- invalid regular expressions;
+- empty pattern arrays;
+- empty IDs, rationales, or pattern strings;
+- duplicate rule IDs;
+- non-positive thresholds.
+
+V1 is intentionally small: no more than eight HIGH and eight MEDIUM rules, and
+every path rule must match a path that exists in the repository.
+
+V1 has exactly three HIGH rules:
+
+1. `workflow-automation` matches `^\.github/workflows/`. If CI or attention
+   automation breaks unnoticed, unvalidated changes can pass or pull requests
+   can be misclassified.
+2. `router-package` matches `^packages/pr-attention-router/`. If floor
+   enforcement or notification code breaks unnoticed, every classified pull
+   request can receive an unsafe result.
+3. `router-host-policy` matches `^pr-attention-router/`. If repository policy or
+   host context breaks unnoticed, every pull request can receive the wrong
+   deterministic floor or AI context.
+
+V1 has exactly five MEDIUM rules:
+
+1. `operational-guidance` matches existing `docs/adr/`, `docs/runbooks/`, and
+   `docs/setup/` paths. If operational guidance breaks unnoticed, adopters or
+   responders can configure or operate the router incorrectly.
+2. `github-configuration` matches non-workflow `.github/` files, including the
+   existing PR template. If PR context configuration breaks unnoticed,
+   reviewers can lose the intent evidence needed for a safe LOW result.
+3. `dashboard-shared-surface` matches the existing dashboard shell, entry
+   point, domain/data contracts, and global/app-shell styles. If one of these
+   shared surfaces breaks unnoticed, every dashboard tier or queue can display
+   incorrect information.
+4. `build-and-dependencies` matches the existing root workspace manifests and
+   dashboard package, TypeScript, Vite, and ESLint configuration. If build or
+   dependency configuration breaks unnoticed, validation or the production
+   dashboard can diverge for all consumers.
+5. `agent-instructions` matches the existing root `AGENTS.md`. If repository
+   instructions break unnoticed, every coding agent can operate under the
+   wrong safety or workflow contract.
+
+Localized dashboard component or copy changes remain eligible for LOW when
+validation passes, material context is sufficient, and no size or breadth
+signal raises the floor.
+
+The engine receives a parsed `DeterministicPolicy`. It evaluates every signal
+instead of returning early on HIGH, checks both rename paths, records
+`matchedRuleIds`, and establishes MEDIUM for deleted tests, failed or missing
+validation, missing/conflicting material context, missing changed-file evidence,
+five or more production files, or 250 or more changed lines.
+
+## Policy conformance
+
+`pr-attention-router/policy-cases.json` contains exactly twelve focused cases.
+Cases specify paths, optional change status, validation status, material
+context, changed-line count, expected floor, expected rule IDs, and forbidden
+rule IDs. The twelve cases are:
+
+1. one case for each of the three HIGH rules;
+2. one representative MEDIUM operational-runbook case;
+3. one LOW localized TierCard case;
+4. one anchored lookalike path that must remain LOW;
+5. failed validation;
+6. missing material context;
+7. conflicting material context;
+8. a deleted test;
+9. five production files;
+10. 250 changed lines.
+
+The conformance harness accepts only the optional evidence overrides needed by
+those built-in signals. It does not introduce a new runtime signal. Additional
+cases are added only after a real misclassification demonstrates the need.
+
+The package tests use a generic fixture policy rather than the host policy.
+`check:policy` is the only code that combines the reusable engine with this
+repository's adapter.
+
+## GitHub assets
+
+Move both GitHub-script helpers into package `lib/` as `.cjs` files so they can
+be loaded with `require()` regardless of a host's root module type. Move the
+generic prompt and JSON output schema into package `lib/`.
+
+Remove:
+
+- `.github/scripts/`
+- `.github/attention-router/`
+
+At runtime, the workflow writes a trusted prompt by concatenating the package's
+generic prompt with `pr-attention-router/host-context.md`. PR title, body, diff,
+and repository instruction files are explicitly untrusted evidence, not
+instructions.
+
+## Workflow contract
+
+The attention workflow retains `workflow_run` as its only trigger and keeps
+top-level `contents: read`. Every job declares explicit least privilege.
+
+Each job checks trusted code out with:
 
 ```yaml
-ref: ${{ github.workflow_sha }}
+ref: ${{ github.sha }}
+persist-credentials: false
 ```
 
-`github.workflow_sha` identifies the commit containing the executing workflow.
-It expresses the invariant more directly than `main` or `github.sha`: every job
-in one run uses the same trusted router and policy revision, independent of the
-default branch name or later branch movement.
+The PR head is checked out separately under `.par/target`. No shell command
+executes with the PR checkout as its working directory. Codex is read-only and
+works only against that inspection checkout. The deterministic floor remains
+binding and AI may only raise it.
 
-The PR checkout remains separate at `.par/target`, with
-`persist-credentials: false`, and no shell command executes with that directory
-as its working directory.
+The workflow sets:
 
-### Contributor policy
-
-Replace the personal login allowlist with the reference POC policy:
-
-- the PR head repository must equal the workflow repository;
-- the PR author must have GitHub user type `User`;
-- `repos.getCollaboratorPermissionLevel` must report `admin`, `maintain`, or
-  `write`;
-- the PR head SHA must still equal the SHA validated by the triggering run.
-
-Fork and bot-authored PRs remain out of scope and fail closed. This is a
-deliberate POC policy, not a universal default for adopting repositories.
-
-### Validation conclusions
-
-Treat `success` as `PASSED`. Treat `failure` and `timed_out` as `FAILED`, and
-continue classification so the deterministic floor is at least MEDIUM.
-Superseded or manually cancelled runs are not added in this phase because the
-head-SHA race and duplicate-run behavior need separate evidence.
-
-### Dependency installation
-
-All retained `npm ci` commands use `--ignore-scripts`. PR 1 keeps installs that
-the current `tsx` runtime requires. PR 2 removes those installs after native
-TypeScript CLIs replace `tsx`; only the email job then installs production
-runtime dependencies.
-
-### Recipient confidentiality
-
-GitHub displays ordinary step environment variables in logs and masks secret
-values only. The existing documentation promise that recipient values never
-appear is therefore incorrect.
-
-Move these from repository variables to repository secrets:
-
-- `PAR_EMAIL_FROM`
-- `PAR_EMAIL_TO_TEAM`
-- `PAR_EMAIL_TO_LEAD`
-
-Keep `SMTP_HOST` and `SMTP_PORT` as variables. Update the workflow references,
-runbook, installation guide, and acceptance criteria. Email must remain disabled
-until the replacement secrets exist.
-
-### Codex instruction isolation
-
-The P3 wording that treats PR titles, bodies, diffs, and repository instruction
-files as evidence is retained, but it is not considered a complete control.
-Codex automatically discovers `AGENTS.md` between the repository root and its
-working directory. Running directly in the untrusted PR checkout therefore
-creates an instruction channel before the trusted prompt is evaluated.
-
-Use two directories:
-
-```text
-.par/
-  analysis/    # trusted Codex working directory, evidence, and prompt
-  target/      # untrusted PR checkout, read-only inspection target
+```yaml
+env:
+  PAR_ROUTER: packages/pr-attention-router
+  PAR_ADAPTER: pr-attention-router
 ```
 
-Codex runs with `safety-strategy: read-only` from `.par/analysis`. The trusted
-prompt directs it to inspect only the diff in `../target`. Because its working
-directory is not inside the PR checkout, PR-authored `AGENTS.md` files are not
-on the working-directory instruction path. The PR contents remain untrusted
-evidence.
-
-This change requires a hosted Actions probe because the Codex action must be
-shown to read the sibling checkout while remaining read-only.
-
-## PR 2: Reusable router boundary
-
-### Layout
-
-Create:
-
-```text
-tools/pr-attention-router/
-  cli/
-    checkPolicy.ts
-    checkWorkflow.ts
-    collectPullRequestEvidence.ts
-    normalizeClassification.ts
-    sendAttentionEmail.ts
-    sendAttentionSlack.ts
-  lib/
-    attention.ts
-    checkWorkflowContract.ts
-    classification-prompt.md
-    classification.schema.json
-    commentState.ts
-    deterministicPolicy.ts
-    emailNotification.ts
-    enforceClassification.ts
-    evaluateDeterministicFloor.ts
-    loadPolicy.ts
-    parseGitDiff.ts
-    policyCases.ts
-    publishAttentionComment.cjs
-    readPrMaterialContext.cjs
-    renderClassification.ts
-    slackNotification.ts
-    smtpEmailTransport.ts
-  config/
-    host-context.md
-    policy-cases.json
-    policy.json
-  test/
-  package.json
-  package-lock.json
-  tsconfig.json
-  README.md
-```
-
-The package uses native TypeScript on Node 24, `node:test`, and `tsc`. It has no
-React, Vite, jsdom, ESLint, Vitest, or `tsx` dependency. GitHub-script helpers
-use `.cjs` so they continue to load when a host root declares
-`"type": "module"`.
-
-`apps/attention-router` remains the optional Vite dashboard. Workflow jobs do
-not install, build, import, or execute it. Router-specific scripts, logic,
-notifications, and tests move out; dashboard UI, sample data, CSS, and UI tests
-remain.
-
-### Host policy schema
-
-`config/policy.json` is repository-owned data with schema version 1. It defines:
-
-- named MEDIUM and HIGH path rules;
-- one or more Unicode regular-expression sources per rule;
-- rationale for each rule;
-- production, non-production, and test file patterns;
-- production-file and changed-line thresholds.
-
-The loader rejects malformed JSON, unsupported versions, LOW path rules,
-invalid or empty regex patterns, empty required strings, non-positive
-thresholds, and duplicate rule IDs.
-
-The reference POC policy encodes only this repository's rules:
-
-- **HIGH:** workflows; router implementation and policy; classification prompt
-  and schema; persistent-comment publisher; credential, security,
-  authorization, persistence, database, and migration paths.
-- **MEDIUM:** operational runbooks and ADRs; shared services and routing;
-  dependency, build, and TypeScript configuration; large changes.
-- **LOW eligibility:** localized presentation changes with passing validation,
-  sufficient material context, and no higher signal.
-
-P3 website rules do not enter the reference policy.
-
-### Policy conformance cases
-
-`config/policy-cases.json` supplies changed paths, expected floor, expected rule
-IDs, and forbidden `notRules`. `checkPolicy.ts` evaluates every case under
-otherwise clean evidence.
-
-Cases cover:
-
-- every MEDIUM and HIGH rule;
-- workflow paths matching HIGH without also matching generic GitHub config;
-- old and new names for renamed files;
-- deleted test files establishing MEDIUM;
-- LOW-eligible localized files;
-- threshold boundaries.
-
-### Deterministic engine
-
-The engine receives a parsed policy rather than importing host path constants.
-It evaluates every signal instead of returning on the first HIGH match. A HIGH
-assessment must still report failed validation, missing or conflicting context,
-deleted tests, and other reviewer-relevant evidence.
-
-`DeterministicAssessment` adds `matchedRuleIds` for audit and conformance tests.
-Rationale remains deduplicated when several patterns or evidence paths match.
-
-### Stack-neutral prompt
-
-The reusable prompt describes blast radius across users, pages, services, data,
-and operators without mentioning One SEO. At runtime, the workflow combines it
-with trusted `config/host-context.md`. Host context describes this POC and its
-validation gaps; future hosts supply their own context.
-
-### Executable workflow contract
-
-Replace the current source-text permission test with `checkWorkflow.ts` backed
-by `checkWorkflowContract.ts`. The contract requires:
-
-- `workflow_run` as the only trigger;
-- exactly `contents: read` at workflow scope;
-- explicit permissions on every job;
-- exactly one repository-writing job;
-- only `issues: write` and `pull-requests: write` in that job;
-- no write-capable job containing the PR checkout;
-- `persist-credentials: false` on every checkout;
-- trusted checkouts pinned to `github.workflow_sha`;
-- PR checkout at `.par/target`;
-- Codex read-only from `.par/analysis`;
-- no shell execution in `.par/target`;
-- no `${{ }}` interpolation inside shell script bodies;
-- no job- or step-level secrets beside PR source, except the Codex API key
-  supplied directly to the read-only Codex action.
-
-The checker must test every claimed invariant. It must not claim that there is
-one writer while merely checking for no more than one, and it must inspect job
-environment blocks as well as individual steps.
-
-## Data flow after both PRs
-
-1. The host validation workflow completes for a PR SHA.
-2. `workflow_run` loads the trusted attention workflow from the default branch.
-3. Each job checks trusted router code out at `github.workflow_sha`.
-4. Evidence checks the PR out separately at `.par/target`, authorizes its
-   repository, human author, permission level, and exact SHA, then evaluates
-   the host policy without executing PR code.
-5. Classify places trusted evidence and prompt material in `.par/analysis`.
-6. Codex performs read-only inspection from `.par/analysis`, treating the PR
-   checkout as untrusted evidence and respecting the deterministic minimum.
-7. Finalize validates AI output, enforces the floor, and renders the persistent
-   comment plus the small notification summary.
-8. Email and Slack independently deliver only when the tier changes.
-9. Publish records delivery outcomes and creates or updates the detailed PR
-   comment even when a notification channel fails.
-
-## Error behavior
-
-- Invalid policy or conformance data fails validation before rollout.
-- Unauthorized, fork, bot-authored, or stale-SHA PRs fail before any provider
-  secret is used.
-- Invalid AI output fails closed; it cannot bypass floor enforcement.
-- Email or Slack failure is visible but cannot block persistent comment
-  publication.
-- Missing notification configuration affects only its isolated delivery job.
-- A malformed workflow fails `check:workflow` in normal repository validation.
-
-## Validation strategy
-
-PR 1 runs the existing application checks:
+It calls all CLIs by path from the trusted checkout. Evidence, classify,
+finalize, Slack, and publish install no packages. Only email runs:
 
 ```bash
-npm --prefix apps/attention-router run lint
-npm --prefix apps/attention-router run test
-npm --prefix apps/attention-router run typecheck
-npm --prefix apps/attention-router run build
-git diff --check
+npm ci --omit=dev --ignore-scripts \
+  --workspace @scope/pr-attention-router \
+  --include-workspace-root=false
 ```
 
-PR 2 additionally runs:
+The email and Slack adapters publish the same three-line summary; the
+persistent PR comment remains the detailed record. Notification failures do
+not block comment publication.
 
-```bash
-npm --prefix tools/pr-attention-router ci --ignore-scripts
-npm --prefix tools/pr-attention-router run check
-npm --prefix tools/pr-attention-router run check:policy
-npm --prefix tools/pr-attention-router run check:workflow
-```
+Replace the Vitest source-text permission test with a package-owned YAML
+contract checker. It enforces:
 
-After trusted workflow changes merge, disposable hosted-Ubuntu PRs validate:
+- only `workflow_run` triggers;
+- exactly `contents: read` globally;
+- explicit job permissions;
+- at most one writing job, limited to `issues` and `pull-requests` write;
+- no write permissions beside the PR checkout;
+- no persisted checkout credentials;
+- trusted checkouts at `github.sha`;
+- PR checkout under `.par/`;
+- read-only Codex inside `.par/target`;
+- no `${{ }}` expressions inside `run:` scripts;
+- no non-Codex secrets beside the PR checkout.
 
-- localized LOW;
-- policy MEDIUM;
-- workflow/policy HIGH;
-- failed and timed-out validation;
-- missing and conflicting material context;
-- deleted tests;
-- same-tier notification suppression;
-- tier-change notification delivery;
-- SMTP and Slack failure isolation;
-- persistent comment creation and update;
-- Codex sibling-checkout inspection from `.par/analysis`.
+## Validation workflow
+
+`Validate repository` remains the host validation contract and gets two jobs:
+
+1. **Router:** filtered workspace install, package typecheck/tests,
+   `check:policy`, and `check:workflow`. This job proves the package without
+   dashboard dependencies installed.
+2. **Dashboard:** complete workspace install, app lint/typecheck/tests/build.
+
+Both run whitespace validation. The overall workflow conclusion supplies the
+attention workflow's PASSED or FAILED evidence. A `timed_out` conclusion is
+also treated as FAILED and still classifies.
+
+## V2 candidates
+
+The installation guide records these as deferred, not V1 policy or behavior:
+
+- Money, authentication, authorization, credential, persistence, migration,
+  deployment, production-configuration, indexability, and CODEOWNERS rules are
+  deferred because this repository has no corresponding host paths today.
+- A generic shared-component rule is deferred because the current leaf
+  components are the intended LOW probe surface; add it only when a real shared
+  design-system directory exists.
+- Binary-file, generated-file, dependency-major-version, and coverage-change
+  signals are deferred because V1 retains only the established non-path
+  signals.
+- Cancelled, stale, skipped, and startup-failure validation conclusions are
+  deferred until their retry and head-SHA behavior is tested.
+- Fork and bot contributor policies are deferred because the isolated POC
+  intentionally accepts only same-repository human collaborators.
+- A reusable `workflow_call` wrapper is deferred until a second package-based
+  host proves the stable host inputs.
+- Compiled JavaScript, `bin` mappings, and private-registry installation are
+  deferred until publication is approved; registry credentials must never
+  share a job with PR source.
+- A broader public API is deferred until the dashboard, mobile, and backend
+  clients identify common imports.
+- Per-app monorepo policy composition is deferred because V1 uses one
+  repository-level policy with app-prefixed rules.
+
+V1 count: **3 HIGH rules, 5 MEDIUM rules, 12 conformance cases**. None exceeds
+the requested targets, so no exception justification is required.
 
 ## Rollout and rollback
 
-Keep `PAR_APP_WORKFLOWS_ENABLED=false` while each trusted workflow change is
-being merged. Enable comment-only classification first, then Slack and email
-one channel at a time. Email stays disabled until recipient secrets replace the
-existing variables.
+Implementation uses one short-lived branch and a conventional PR title. The PR
+is not merged without owner review. Keep the attention workflow disabled while
+trusted package and workflow files are being installed. After merge, enable
+comment-only classification and repeat LOW, MEDIUM, and HIGH hosted probes
+before enabling notification channels.
 
-Rollback is controlled by setting all enablement variables to `false`. PR 1 can
-be reverted independently. PR 2 can restore workflow commands to the app layout
-without changing application source because the dashboard and router remain
-separate throughout the migration.
-
-## Future package extraction
-
-The `tools/` boundary is the validated copy-in form, not the final distribution
-form. After the mobile and backend installations, compare their adapters and
-promote only proven common interfaces into `packages/pr-attention-router`.
-
-A workspace package may continue using native TypeScript because Node resolves
-the workspace symlink to source outside `node_modules`. A published package must
-ship compiled JavaScript. Future candidates include CLI `bin` mappings, a small
-`lib/index.ts` public API, exported `.cjs` helpers and prompt/schema assets, and
-a reusable `workflow_call` workflow. Private registry credentials must never be
-present in a job that also contains the PR checkout.
-
-## Source implementation differences
-
-The P3 implementation is evidence that the architecture works, but this design
-intentionally changes four details before backporting:
-
-1. Use `github.workflow_sha`, not `github.sha`, for trusted checkouts.
-2. Run Codex from `.par/analysis`, not the untrusted `.par/target` checkout.
-3. Strengthen the workflow checker to require exactly one narrowly scoped writer
-   and inspect job-level secrets.
-4. Supply a reference-POC policy and host context rather than copying P3 rules.
+Rollback begins by setting all enablement variables to `false`. Reverting the
+implementation PR restores the app-contained router without changing the V1
+authority boundary.
