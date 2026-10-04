@@ -17,7 +17,8 @@ jobs:
     name: Collect trusted evidence
     if: >
       vars.PAR_APP_WORKFLOWS_ENABLED == 'true' &&
-      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.conclusion == 'success' ||
+        github.event.workflow_run.conclusion == 'failure') &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       github.event.workflow_run.actor.login == 'jdavault' &&
@@ -110,6 +111,7 @@ jobs:
           PR_BODY: ${{ steps.pr-context.outputs.body }}
           JIRA_REFERENCE: ${{ steps.pr-context.outputs.jira-reference }}
           MATERIAL_CONTEXT: ${{ steps.pr-context.outputs.material-context }}
+          VALIDATION_STATUS: ${{ github.event.workflow_run.conclusion == 'success' && 'PASSED' || 'FAILED' }}
         run: |
           jira_arguments=()
           if [[ -n "$JIRA_REFERENCE" ]]; then
@@ -124,7 +126,7 @@ jobs:
             --title "$PR_TITLE" \
             --body "$PR_BODY" \
             --material-context "$MATERIAL_CONTEXT" \
-            --validation-status PASSED \
+            --validation-status "$VALIDATION_STATUS" \
             "${jira_arguments[@]}" > .par/evidence.json
 
       - name: Export bounded deterministic evidence
