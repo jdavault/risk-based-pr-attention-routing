@@ -17,7 +17,8 @@ jobs:
     name: Collect trusted evidence
     if: >
       vars.PAR_APP_WORKFLOWS_ENABLED == 'true' &&
-      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.conclusion == 'success' ||
+        github.event.workflow_run.conclusion == 'failure') &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       github.event.workflow_run.actor.login == 'jdavault' &&
@@ -33,14 +34,14 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Check out pull request for inspection
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
           fetch-depth: 0
@@ -48,7 +49,7 @@ jobs:
           path: .par/target
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -59,13 +60,16 @@ jobs:
 
       - name: Read and authorize pull request context
         id: pr-context
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@v7
         env:
           EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
         with:
           github-token: ${{ github.token }}
           script: |
+            const { readPrMaterialContext } = require(
+              './.github/scripts/read-pr-material-context.js',
+            );
             const number = Number(process.env.PAR_PR_NUMBER);
             const { data: pullRequest } = await github.rest.pulls.get({
               owner: context.repo.owner,
@@ -96,10 +100,7 @@ jobs:
             core.setOutput('title', pullRequest.title);
             core.setOutput('body', body);
             core.setOutput('jira-reference', jiraReference);
-            core.setOutput(
-              'material-context',
-              body.trim().length >= 40 ? 'SUFFICIENT' : 'MISSING',
-            );
+            core.setOutput('material-context', readPrMaterialContext(body));
             core.setOutput('context', JSON.stringify(prContext));
 
       - name: Collect deterministic evidence
@@ -110,6 +111,7 @@ jobs:
           PR_BODY: ${{ steps.pr-context.outputs.body }}
           JIRA_REFERENCE: ${{ steps.pr-context.outputs.jira-reference }}
           MATERIAL_CONTEXT: ${{ steps.pr-context.outputs.material-context }}
+          VALIDATION_STATUS: ${{ github.event.workflow_run.conclusion == 'success' && 'PASSED' || 'FAILED' }}
         run: |
           jira_arguments=()
           if [[ -n "$JIRA_REFERENCE" ]]; then
@@ -124,12 +126,12 @@ jobs:
             --title "$PR_TITLE" \
             --body "$PR_BODY" \
             --material-context "$MATERIAL_CONTEXT" \
-            --validation-status PASSED \
+            --validation-status "$VALIDATION_STATUS" \
             "${jira_arguments[@]}" > .par/evidence.json
 
       - name: Export bounded deterministic evidence
         id: export-evidence
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@v7
         with:
           script: |
             const fs = require('node:fs');
@@ -153,14 +155,14 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Check out pull request for inspection
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
           fetch-depth: 0
@@ -168,7 +170,7 @@ jobs:
           path: .par/target
 
       - name: Provide trusted evidence to Codex
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@v7
         env:
           DETERMINISTIC_JSON: ${{ needs.evidence.outputs.deterministic-json }}
         with:
@@ -183,7 +185,7 @@ jobs:
 
       - name: Run read-only Codex classification
         id: codex
-        uses: openai/codex-action@52fe01ec70a42f454c9d2ebd47598f9fd6893d56 # v1.11
+        uses: openai/codex-action@v1.8
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           safety-strategy: read-only
@@ -207,14 +209,14 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -237,7 +239,7 @@ jobs:
 
       - name: Inspect existing PR attention state
         id: inspect-comment
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@v7
         env:
           PAR_DRY_RUN: 'true'
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
@@ -252,8 +254,7 @@ jobs:
     needs: [evidence, finalize]
     if: >-
       needs.finalize.outputs.should-notify == 'true' &&
-      vars.PAR_EMAIL_ENABLED == 'true' &&
-      vars.PAR_EMAIL_PROVIDER == 'resend'
+      vars.PAR_EMAIL_ENABLED == 'true'
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 10
     permissions:
@@ -261,14 +262,14 @@ jobs:
 
     steps:
       - name: Check out trusted router from main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -281,7 +282,8 @@ jobs:
         env:
           CLASSIFICATION_JSON: ${{ needs.finalize.outputs.classification-json }}
           PR_CONTEXT_JSON: ${{ needs.evidence.outputs.pr-context-json }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
           PAR_EMAIL_FROM: ${{ vars.PAR_EMAIL_FROM }}
           PAR_EMAIL_TO_TEAM: ${{ vars.PAR_EMAIL_TO_TEAM }}
           PAR_EMAIL_TO_LEAD: ${{ vars.PAR_EMAIL_TO_LEAD }}
@@ -291,9 +293,50 @@ jobs:
             --classification-json "$CLASSIFICATION_JSON" \
             --pr-context-json "$PR_CONTEXT_JSON"
 
+  slack:
+    name: Send changed-tier Slack message
+    needs: [evidence, finalize]
+    if: >-
+      needs.finalize.outputs.should-notify == 'true' &&
+      vars.PAR_SLACK_ENABLED == 'true'
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out trusted router from main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/attention-router/package-lock.json
+
+      - name: Install trusted router dependencies
+        run: npm ci --prefix apps/attention-router
+
+      - name: Send Slack attention message
+        env:
+          CLASSIFICATION_JSON: ${{ needs.finalize.outputs.classification-json }}
+          PR_CONTEXT_JSON: ${{ needs.evidence.outputs.pr-context-json }}
+          PAR_SLACK_CHANNEL_ID: ${{ vars.PAR_SLACK_CHANNEL_ID }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          ./apps/attention-router/node_modules/.bin/tsx \
+            apps/attention-router/scripts/sendAttentionSlack.ts \
+            --classification-json "$CLASSIFICATION_JSON" \
+            --pr-context-json "$PR_CONTEXT_JSON"
+
   publish:
     name: Publish attention result
-    needs: [finalize, email]
+    needs: [finalize, email, slack]
     if: >
       always() &&
       needs.finalize.result == 'success'
@@ -304,15 +347,27 @@ jobs:
       issues: write
 
     steps:
+      - name: Record notification outcomes
+        env:
+          EMAIL_RESULT: ${{ needs.email.result }}
+          SLACK_RESULT: ${{ needs.slack.result }}
+        run: |
+          {
+            echo '## PR Attention notification outcomes'
+            echo
+            echo "- Email: $EMAIL_RESULT"
+            echo "- Slack: $SLACK_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check out trusted router from main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
           persist-credentials: false
 
       - name: Restore finalized classification
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@v7
         env:
           CLASSIFICATION_JSON: ${{ needs.finalize.outputs.classification-json }}
         with:
@@ -326,7 +381,7 @@ jobs:
             );
 
       - name: Create or update persistent PR comment
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@v7
         env:
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
         with:

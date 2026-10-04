@@ -1,0 +1,89 @@
+.card {
+  background: #152038;
+  border-top: 4px solid var(--tier-accent);
+  border-radius: 1rem;
+  box-shadow: 0 1rem 2rem rgb(0 18 20 / 20%);
+  display: flex;
+  flex-direction: column;
+  min-height: 16.5rem;
+  padding: 1.25rem;
+}
+
+.low {
+  --tier-accent: #69e69a;
+}
+
+.medium {
+  --tier-accent: #ffc857;
+}
+
+.high {
+  --tier-accent: #ff7a70;
+}
+
+.headingRow {
+  align-items: start;
+  display: flex;
+  justify-content: space-between;
+  gap: 3rem;
+}
+
+.title {
+  margin: 0.15rem 0 0;
+}
+
+.eyebrow {
+  color: var(--tier-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.count {
+  align-items: center;
+  background: var(--tier-accent);
+  border-radius: 999px;
+  color: #07101e;
+  display: inline-flex;
+  font-weight: 800;
+  height: 2.25rem;
+  justify-content: center;
+  min-width: 2.25rem;
+}
+
+.reviewer {
+  color: #f4f7fb;
+  font-weight: 700;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.guidance {
+  color: #d4dae4;
+  line-height: 1.55;
+  margin: 0 0 1.25rem;
+}
+
+.filterButton {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--tier-accent);
+  border-radius: 999px;
+  color: #f8fbff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  margin-top: auto;
+  padding: 0.6rem 1rem;
+}
+
+.filterButton[aria-pressed='true'] {
+  background: var(--tier-accent);
+  color: #07101e;
+}
+
+.filterButton:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
+}

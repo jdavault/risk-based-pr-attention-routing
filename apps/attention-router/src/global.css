@@ -1,0 +1,39 @@
+:root {
+  color: #f7f9fc;
+  background: #081321;
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 20rem;
+}
+
+body {
+  background:
+    radial-gradient(circle at 20% 0%, rgb(31 88 105 / 24%), transparent 34rem),
+    #081321;
+  margin: 0;
+  min-width: 20rem;
+  min-height: 100vh;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}

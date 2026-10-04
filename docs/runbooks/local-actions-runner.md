@@ -134,27 +134,32 @@ passes and immediately before testing the complete attention workflow:
 | Kind | Name | Purpose |
 | --- | --- | --- |
 | Secret | `OPENAI_API_KEY` | Codex classification through the action's credential proxy. |
-| Secret | `RESEND_API_KEY` | Optional Resend delivery after notification code is implemented. |
-| Variable | `PAR_EMAIL_PROVIDER` | Set to `resend` when Resend delivery is ready. |
 | Variable | `PAR_EMAIL_ENABLED` | Set to `true` only for an intentional delivery test. |
-| Variable | `PAR_EMAIL_FROM` | A sender on a domain verified by Resend. |
+| Variable | `SMTP_HOST` | SMTP host reachable from the runner; `localhost` for local smtp4dev. |
+| Variable | `SMTP_PORT` | SMTP port; `25` for the POC and work-aligned setup. |
+| Variable | `PAR_EMAIL_FROM` | Email sender address. |
 | Variable | `PAR_EMAIL_TO_TEAM` | Comma-delimited LOW and MEDIUM recipients. |
 | Variable | `PAR_EMAIL_TO_LEAD` | Comma-delimited HIGH recipients. |
+| Secret | `SLACK_BOT_TOKEN` | Bot user OAuth token used only by the Slack notification job. |
+| Variable | `PAR_SLACK_CHANNEL_ID` | Slack channel ID containing the bot. |
+| Variable | `PAR_SLACK_ENABLED` | Set to `true` only for an intentional Slack delivery test. |
 
-Keep `PAR_EMAIL_ENABLED` absent or `false` until the sender is verified and the
-Resend implementation has automated tests. Never commit provider keys,
-recipient addresses, or registration tokens.
+Keep `PAR_EMAIL_ENABLED` absent or `false` until the SMTP adapter has automated
+tests and one intentional local delivery succeeds. Never commit recipient
+addresses or registration tokens.
 
 ## Codex boundary
 
-The classification job uses a reviewed, immutable Codex Action release with
+The classification job uses the reviewed Codex Action release tag aligned
+with the master workflow and
 `safety-strategy: read-only`. Codex may inspect the checked-out pull request but
 cannot write to the filesystem or access the network directly. The action
 proxies the API request using `OPENAI_API_KEY`.
 
 Keep the existing safeguards:
 
-- only successful validation runs can trigger classification;
+- successful and failed validation runs can trigger classification so a failed
+  validation establishes its deterministic floor;
 - only `jdavault`-authored, same-repository pull requests are accepted;
 - the pull request head SHA must still match the validated SHA;
 - the Codex job has `contents: read` permission only;
@@ -191,7 +196,8 @@ it again.
 | Runner registration token is rejected | Generate a new token; registration tokens expire quickly. |
 | Application jobs are skipped | Keep them skipped while the app is incomplete; later set `PAR_APP_WORKFLOWS_ENABLED=true`. |
 | Codex job cannot authenticate | Confirm `OPENAI_API_KEY` exists as a repository Actions secret and was not stored as a variable. |
-| Email job is skipped | This is expected until `PAR_EMAIL_PROVIDER=resend` and `PAR_EMAIL_ENABLED=true`. |
+| Email job is skipped | This is expected until `PAR_EMAIL_ENABLED=true`. |
+| Slack job is skipped | This is expected until `PAR_SLACK_ENABLED=true`. |
 
 GitHub's current runner installation commands and token are authoritative when
 they differ from this runbook.

@@ -80,20 +80,22 @@ Classification remains valid if a notification transport fails, but the workflow
 
 ### Slack
 
-- Slack is deferred from the initial implementation.
-- A later phase may use `amex-eng/github-actions-slack/github/workflows/message-slack.yml@v1` after the sandbox has an approved token and confirmed access to the target channel.
-- Adding Slack requires a reviewed plan change; the initial V1 contains no Slack code or Slack secret reference.
+- Use a bot user OAuth token with `chat:write` and Slack's `chat.postMessage`
+  method so the POC matches the work integration model.
+- Configure `SLACK_BOT_TOKEN` as a repository secret and
+  `PAR_SLACK_CHANNEL_ID` plus `PAR_SLACK_ENABLED` as repository variables.
+- Keep the Slack job isolated from classification and comment publication so a
+  notification failure cannot change the attention result.
 
 ### Email
 
-- Use Resend's HTTPS API through a small notification adapter; do not require an SMTP relay.
-- Store a sending-only, domain-restricted `RESEND_API_KEY` only as a repository secret.
-- Configure the provider, verified sender, and recipients through `PAR_EMAIL_PROVIDER`, `PAR_EMAIL_FROM`, `PAR_EMAIL_TO_TEAM`, and `PAR_EMAIL_TO_LEAD` repository variables.
+- Use SMTP through a small notification adapter, with smtp4dev as the local capture server and the work SMTP relay as the eventual target.
+- Configure the host, port, sender, and recipients through `SMTP_HOST`, `SMTP_PORT`, `PAR_EMAIL_FROM`, `PAR_EMAIL_TO_TEAM`, and `PAR_EMAIL_TO_LEAD` repository variables.
 - Preserve secrets and recipient values outside the repository and keep notification logs metadata-only.
 - Gate delivery with `PAR_EMAIL_ENABLED`; email remains disabled until the adapter and sender are verified.
 - Use a stable idempotency key for each pull-request tier transition so bounded retries cannot create duplicate mail.
 
-The notification job does not receive the OpenAI API key. The Codex job does not receive the Resend credential.
+The notification job does not receive the OpenAI API key. The Codex job does not receive SMTP configuration.
 
 ## State and Change-only Delivery
 
