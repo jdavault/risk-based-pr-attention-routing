@@ -31,6 +31,10 @@ const highRiskPathPatterns: readonly RegExp[] = [
 const sharedCodePathPattern =
   /(^|\/)(hooks|services|shared|state|router)(\/|[-_.])/iu;
 
+const operationalRunbookPathPatterns: readonly RegExp[] = [
+  /^docs\/runbooks\//iu,
+];
+
 const dependencyOrConfigurationPatterns: readonly RegExp[] = [
   /(^|\/)package(?:-lock)?\.json$/iu,
   /(^|\/)(?:vite|eslint|commitlint|webpack|rollup)\.config\.[cm]?[jt]s$/iu,
@@ -102,6 +106,12 @@ export function evaluateDeterministicFloor(
     sharedCodePathPattern.test(allChangedPaths(evidence.changedFiles))
   ) {
     rationale.push('Shared hook or service changed.');
+  }
+
+  if (
+    hasMatchingPath(evidence.changedFiles, operationalRunbookPathPatterns)
+  ) {
+    rationale.push('Operational runbook changed.');
   }
 
   if (
