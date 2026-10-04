@@ -20,8 +20,8 @@ Configure these under **Settings → Secrets and variables → Actions**.
 | Variable | Purpose |
 | --- | --- |
 | `PAR_EMAIL_ENABLED` | Must equal `true` to permit delivery. Any other value keeps delivery off. |
-| `SMTP_HOST` | SMTP host reachable from the self-hosted runner; `localhost` for local smtp4dev. |
-| `SMTP_PORT` | SMTP port; `25` for the POC and work-aligned configuration. |
+| `SMTP_HOST` | SMTP host reachable from the active runner; `localhost` for the local runner or the hostname from an ngrok TCP endpoint for a GitHub-hosted runner. |
+| `SMTP_PORT` | Port paired with `SMTP_HOST`; `25` for local smtp4dev or the public port assigned by ngrok. |
 | `PAR_EMAIL_FROM` | Sender address used in notification messages. |
 | `PAR_EMAIL_TO_TEAM` | Comma-delimited recipients for LOW and MEDIUM classifications. |
 | `PAR_EMAIL_TO_LEAD` | Comma-delimited recipients for HIGH classifications. |
@@ -40,6 +40,76 @@ code. Never store API keys or recipient addresses in workflow source or logs.
 6. Set `PAR_EMAIL_ENABLED=true` only for an intentional workflow test.
 7. Confirm that workflow logs contain delivery metadata only—never the body,
    recipients, or credential.
+
+## Expose smtp4dev through ngrok
+
+Use separate tunnels for the smtp4dev web inbox and SMTP transport. HTTP is
+appropriate for the inbox on local port `8025`; SMTP on local port `25`
+requires a raw TCP tunnel.
+
+Add the following entries under `tunnels` in
+`~/Library/Application Support/ngrok/ngrok.yml`:
+
+```yaml
+tunnels:
+  p3sg-email:
+    proto: http
+    addr: 8025
+    subdomain: p3sg-email
+  p3sg-smtp:
+    proto: tcp
+    addr: 25
+```
+
+Start both tunnels and leave the process running:
+
+```bash
+ngrok start p3sg-smtp p3sg-email \
+  --config "$HOME/Library/Application Support/ngrok/ngrok.yml"
+```
+
+The tunnel name `p3sg-smtp` is not a public hostname. Unless the account has a
+reserved TCP address, ngrok assigns a dynamic endpoint resembling
+`tcp://6.tcp.us-cal-1.ngrok.io:26541`. Read the live endpoint from the agent's
+local API:
+
+```bash
+curl -s http://127.0.0.1:4040/api/tunnels |
+  jq -r '.tunnels[] | select(.name == "p3sg-smtp") | .public_url'
+```
+
+Extract the host and port and update the GitHub Actions variables after every
+ngrok restart:
+
+```bash
+smtp_url=$(curl -s http://127.0.0.1:4040/api/tunnels |
+  jq -r '.tunnels[] | select(.name == "p3sg-smtp") | .public_url')
+
+smtp_endpoint=${smtp_url#tcp://}
+smtp_host=${smtp_endpoint%:*}
+smtp_port=${smtp_endpoint##*:}
+
+gh variable set SMTP_HOST --body "$smtp_host"
+gh variable set SMTP_PORT --body "$smtp_port"
+
+echo "SMTP_HOST=$smtp_host"
+echo "SMTP_PORT=$smtp_port"
+```
+
+Do not include the `tcp://` scheme in `SMTP_HOST`, and do not set the public
+port to local port `25`. For example, the endpoint above maps to
+`SMTP_HOST=6.tcp.us-cal-1.ngrok.io` and `SMTP_PORT=26541`; ngrok forwards that
+public port to local port `25`.
+
+Open <https://p3sg-email.ngrok.io> to inspect captured messages. Keep both
+tunnels temporary because they expose the capture inbox and SMTP listener to
+the public internet. A reserved ngrok TCP address avoids changing the GitHub
+variables after every restart.
+
+Some ISPs intercept ngrok TCP DNS names even when the tunnel is healthy. If
+the public hostname resolves to an ISP block page, test the SMTP endpoint from
+a GitHub-hosted runner or another network. Do not replace the ngrok hostname
+with the tunnel name.
 
 ## Routing and content
 
