@@ -135,8 +135,8 @@ passes and immediately before testing the complete attention workflow:
 | --- | --- | --- |
 | Secret | `OPENAI_API_KEY` | Codex classification through the action's credential proxy. |
 | Variable | `PAR_EMAIL_ENABLED` | Set to `true` only for an intentional delivery test. |
-| Variable | `SMTP_HOST` | SMTP host reachable from the runner; `localhost` for local smtp4dev. |
-| Variable | `SMTP_PORT` | SMTP port; `25` for the POC and work-aligned setup. |
+| Variable | `SMTP_HOST` | SMTP host reachable from the runner; `localhost` for local smtp4dev or the assigned ngrok TCP hostname for a GitHub-hosted runner. |
+| Variable | `SMTP_PORT` | Port paired with `SMTP_HOST`; local smtp4dev uses `25`, while ngrok assigns a public TCP port. |
 | Variable | `PAR_EMAIL_FROM` | Email sender address. |
 | Variable | `PAR_EMAIL_TO_TEAM` | Comma-delimited LOW and MEDIUM recipients. |
 | Variable | `PAR_EMAIL_TO_LEAD` | Comma-delimited HIGH recipients. |
@@ -147,6 +147,10 @@ passes and immediately before testing the complete attention workflow:
 Keep `PAR_EMAIL_ENABLED` absent or `false` until the SMTP adapter has automated
 tests and one intentional local delivery succeeds. Never commit recipient
 addresses or registration tokens.
+
+See the [PR attention notification runbook](pr-attention-notification.md#expose-smtp4dev-through-ngrok)
+for the two-tunnel ngrok configuration, dynamic endpoint lookup, and GitHub
+variable update commands used when testing from a GitHub-hosted runner.
 
 ## Codex boundary
 
