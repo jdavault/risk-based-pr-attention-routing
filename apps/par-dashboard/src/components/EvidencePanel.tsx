@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
-import { renderClassificationComment } from '@scope/pr-attention-router';
 
 import type { RiskDimension, SamplePullRequest } from '../domain/attention';
+import { renderClassificationComment } from '../domain/renderClassificationComment';
 import { toSampleClassification } from '../domain/sampleClassification';
 import styles from './EvidencePanel.module.css';
 

@@ -17,6 +17,9 @@ describe('App', () => {
       screen.getByText('Proof of concept • Classification only.'),
     ).toBeVisible();
     expect(screen.getByText('Human authority preserved')).toBeVisible();
+    expect(
+      screen.getAllByText('Developer familiar with the affected area').length,
+    ).toBeGreaterThan(0);
   });
 
   it('filters the review queue by attention tier', async () => {

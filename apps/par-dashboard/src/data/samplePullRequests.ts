@@ -8,7 +8,7 @@ export const samplePullRequests: readonly SamplePullRequest[] = [
     repository: 'risk-based-pr-attention-routing',
     tier: 'LOW',
     reviewerType: 'NON_LEAD_DEVELOPER',
-    reviewerLabel: 'Non-lead developer',
+    reviewerLabel: 'Developer familiar with the affected area',
     summary:
       'Clarifies isolated dashboard copy without changing shared behavior.',
     evidence: ['Copy only', '1 file', 'Tests passing'],
@@ -38,7 +38,7 @@ export const samplePullRequests: readonly SamplePullRequest[] = [
     repository: 'risk-based-pr-attention-routing',
     tier: 'MEDIUM',
     reviewerType: 'NON_LEAD_DEVELOPER',
-    reviewerLabel: 'Non-lead developer',
+    reviewerLabel: 'Developer familiar with the affected area',
     summary:
       'Changes shared filtering behavior used by the tier cards and review queue.',
     evidence: ['Shared state', '4 files', 'Behavior change'],

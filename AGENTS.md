@@ -23,11 +23,10 @@
 
 ## Current Focus
 
-- Validate PR #11, which extracts the application-independent router into
-  `packages/pr-attention-router`, keeps host policy in
-  `config/pr-attention-router`, and makes `apps/par-dashboard` an optional
-  UI-only client.
-- After merge, open an acceptance PR to test the new default-branch
+- Reduce the extracted router to the reviewed lean P3 contract: one generic
+  package module, host-owned rules and rubric, a two-job attention workflow,
+  and Slack-only change notifications.
+- After merge, open acceptance PRs to test the new default-branch
   `workflow_run` orchestration end to end.
 
 ## Session Log
@@ -42,3 +41,14 @@
 - In Progress: PR #11 hosted validation and post-merge acceptance testing.
 - Next: Verify package/policy/dashboard checks, merge only after owner review,
   then exercise the landed workflow with a harmless classification PR.
+
+### Session 2026-10-04 — Lean router
+
+- Branch: `refactor/lean-pr-attention-router`
+- Focus: Port the reviewed P3 lean attention-router contract without using a
+  worktree.
+- In progress: Replace the multi-module package and email path with a generic
+  `route.ts`, repository `rules.json`/`rubric.md`, two workflow jobs, and
+  Slack-only notification.
+- Next: Validate locally, review the complete branch, open a PR, and do not
+  merge without owner review.

@@ -16,7 +16,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@scope/pr-attention-router": "*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

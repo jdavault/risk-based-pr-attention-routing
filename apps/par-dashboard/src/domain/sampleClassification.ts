@@ -1,6 +1,19 @@
-import type { FinalClassification } from '@scope/pr-attention-router';
+import type {
+  ReviewerType,
+  RiskTier,
+  SamplePullRequest,
+} from './attention';
 
-import type { SamplePullRequest } from './attention';
+export interface FinalClassification {
+  readonly tier: RiskTier;
+  readonly deterministicFloor: RiskTier;
+  readonly summary: string;
+  readonly rationale: readonly string[];
+  readonly blastRadius: string;
+  readonly reviewFocus: readonly string[];
+  readonly reviewerType: ReviewerType;
+  readonly missingEvidence: readonly string[];
+}
 
 export function toSampleClassification(
   pullRequest: SamplePullRequest,
