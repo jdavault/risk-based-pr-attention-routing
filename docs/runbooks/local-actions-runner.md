@@ -1,5 +1,7 @@
 # Local Actions Runner (Optional, Retired from the POC)
 
+<!-- Acceptance probe: a runbook-only comment must retain the MEDIUM floor. -->
+
 ## Current status
 
 The active validation and PR Attention Router workflows run on
