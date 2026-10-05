@@ -1,6 +1,6 @@
+import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
 
 type MaterialContextState = 'SUFFICIENT' | 'MISSING' | 'CONFLICTING';
 
@@ -10,37 +10,36 @@ interface ReadPrMaterialContextModule {
 
 const require = createRequire(import.meta.url);
 const { readPrMaterialContext } = require(
-  '../../../../../.github/scripts/read-pr-material-context.js',
+  '../lib/readPrMaterialContext.cjs',
 ) as ReadPrMaterialContextModule;
 
 describe('readPrMaterialContext', () => {
   it('reads an explicit sufficient declaration', () => {
-    expect(
+    assert.equal(
       readPrMaterialContext(
         '## Intent\nUpdate isolated copy.\n\nMaterial context: SUFFICIENT',
       ),
-    ).toBe('SUFFICIENT');
+      'SUFFICIENT',
+    );
   });
 
   it('reads an explicit conflicting declaration', () => {
-    expect(
+    assert.equal(
       readPrMaterialContext('Material context: conflicting'),
-    ).toBe('CONFLICTING');
+      'CONFLICTING',
+    );
   });
 
   it('treats an absent declaration as missing', () => {
-    expect(
-      readPrMaterialContext(
-        'This description is deliberately longer than forty characters.',
-      ),
-    ).toBe('MISSING');
+    assert.equal(readPrMaterialContext('No declaration.'), 'MISSING');
   });
 
   it('fails closed when declarations disagree', () => {
-    expect(
+    assert.equal(
       readPrMaterialContext(
         'Material context: SUFFICIENT\nMaterial context: CONFLICTING',
       ),
-    ).toBe('CONFLICTING');
+      'CONFLICTING',
+    );
   });
 });
