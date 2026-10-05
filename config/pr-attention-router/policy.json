@@ -36,7 +36,7 @@
       "id": "dashboard-shared-surface",
       "tier": "MEDIUM",
       "patterns": [
-        "^apps/attention-router/src/(?:(?:App|main)\\.tsx$|(?:domain|data)/|(?:global|App\\.module)\\.css$)"
+        "^apps/par-dashboard/src/(?:(?:App|main)\\.tsx$|(?:domain|data)/|(?:global|App\\.module)\\.css$)"
       ],
       "rationale": "If the dashboard shell or shared model breaks unnoticed, every dashboard tier or queue can display incorrect information."
     },
@@ -45,7 +45,7 @@
       "tier": "MEDIUM",
       "patterns": [
         "^package(?:-lock)?\\.json$",
-        "^apps/attention-router/(?:package\\.json|tsconfig(?:\\.[^.]+)?\\.json|vite\\.config\\.ts|eslint\\.config\\.js)$"
+        "^apps/par-dashboard/(?:package\\.json|tsconfig(?:\\.[^.]+)?\\.json|vite\\.config\\.ts|eslint\\.config\\.js)$"
       ],
       "rationale": "If build or dependency configuration breaks unnoticed, validation or the production dashboard can diverge for all consumers."
     },

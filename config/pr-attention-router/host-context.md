@@ -2,7 +2,7 @@
 
 This repository is an isolated proof of concept for classification-only pull
 request attention routing. `packages/pr-attention-router` contains the reusable
-router, while `apps/attention-router` is an optional React, TypeScript, and Vite
+router, while `apps/par-dashboard` is an optional React, TypeScript, and Vite
 dashboard that displays synthetic LOW, MEDIUM, and HIGH examples. The dashboard
 is not required for classification and has no production deployment authority.
 

@@ -124,13 +124,13 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Lint
-        run: npm run lint --workspace attention-router-poc
+        run: npm run lint --workspace par-dashboard
 
       - name: Type-check
-        run: npm run typecheck --workspace attention-router-poc
+        run: npm run typecheck --workspace par-dashboard
 
       - name: Test
-        run: npm test --workspace attention-router-poc
+        run: npm test --workspace par-dashboard
 
       - name: Build
-        run: npm run build --workspace attention-router-poc
+        run: npm run build --workspace par-dashboard

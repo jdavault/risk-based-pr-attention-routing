@@ -212,7 +212,7 @@ The standalone React and TypeScript app provides controlled LOW, MEDIUM, and
 HIGH examples for local testing.
 
 ```bash
-cd apps/attention-router
+cd apps/par-dashboard
 npm ci
 npm run dev -- --port 5157
 ```
@@ -235,4 +235,4 @@ npm run build
 
 ## Attention Router Dashboard
 
-![PR Attention Router dashboard showing LOW, MEDIUM, and HIGH review tiers](apps/attention-router/public/assets/pr-attention-router-dashboard.png)
+![PR Attention Router dashboard showing LOW, MEDIUM, and HIGH review tiers](apps/par-dashboard/public/assets/pr-attention-router-dashboard.png)
