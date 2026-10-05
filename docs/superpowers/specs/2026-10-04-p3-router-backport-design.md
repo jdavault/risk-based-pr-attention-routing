@@ -9,7 +9,7 @@ The reference repository is a Turborepo/npm-workspaces monorepo. Its reusable
 engine lives in `packages/pr-attention-router`, its repository-specific adapter
 lives in `config/pr-attention-router`, and `apps/website` remains a host
 application. This repository follows the same separation while retaining the
-owner-requested root adapter path `pr-attention-router/`.
+owner-requested root adapter path `config/pr-attention-router/`.
 
 ## Purpose
 
@@ -50,14 +50,14 @@ source.
 package.json
 package-lock.json
 packages/
-  pr-attention-router/
+  config/pr-attention-router/
     cli/
     lib/
     test/
     package.json
     tsconfig.json
     README.md
-pr-attention-router/
+config/pr-attention-router/
   policy.json
   policy-cases.json
   host-context.md
@@ -121,7 +121,7 @@ published package must compile JavaScript before distribution.
 
 ## Dashboard boundary
 
-`apps/attention-router` declares a workspace dependency on
+`apps/par-dashboard` declares a workspace dependency on
 `@scope/pr-attention-router`. It imports package-owned risk types and rendering
 instead of defining or copying router behavior. UI-only types, tier labels,
 sample data, React components, CSS, Vitest, and Vite remain in the app.
@@ -146,7 +146,7 @@ The app no longer contains:
 
 ## Host policy
 
-`pr-attention-router/policy.json` is this repository's adapter. Schema version
+`config/pr-attention-router/policy.json` is this repository's adapter. Schema version
 1 contains named MEDIUM and HIGH path rules, Unicode regex sources, rationale,
 production/non-production/test patterns, and size thresholds.
 
@@ -171,7 +171,7 @@ V1 has exactly three HIGH rules:
 2. `router-package` matches `^packages/pr-attention-router/`. If floor
    enforcement or notification code breaks unnoticed, every classified pull
    request can receive an unsafe result.
-3. `router-host-policy` matches `^pr-attention-router/`. If repository policy or
+3. `router-host-policy` matches `^config/pr-attention-router/`. If repository policy or
    host context breaks unnoticed, every pull request can receive the wrong
    deterministic floor or AI context.
 
@@ -207,7 +207,7 @@ five or more production files, or 250 or more changed lines.
 
 ## Policy conformance
 
-`pr-attention-router/policy-cases.json` contains exactly twelve focused cases.
+`config/pr-attention-router/policy-cases.json` contains exactly twelve focused cases.
 Cases specify paths, optional change status, validation status, material
 context, changed-line count, expected floor, expected rule IDs, and forbidden
 rule IDs. The twelve cases are:
@@ -243,7 +243,7 @@ Remove:
 - `.github/attention-router/`
 
 At runtime, the workflow writes a trusted prompt by concatenating the package's
-generic prompt with `pr-attention-router/host-context.md`. PR title, body, diff,
+generic prompt with `config/pr-attention-router/host-context.md`. PR title, body, diff,
 and repository instruction files are explicitly untrusted evidence, not
 instructions.
 
@@ -269,7 +269,7 @@ The workflow sets:
 ```yaml
 env:
   PAR_ROUTER: packages/pr-attention-router
-  PAR_ADAPTER: pr-attention-router
+  PAR_ADAPTER: config/pr-attention-router
 ```
 
 It calls all CLIs by path from the trusted checkout. Evidence, classify,

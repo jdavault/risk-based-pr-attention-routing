@@ -4,7 +4,7 @@
 
 **Goal:** Extract the classification-only PR Attention Router into an application-independent npm workspace package with repository-owned policy data, leaving the Vite dashboard as a tested client.
 
-**Architecture:** A private root npm workspace owns the canonical lockfile and links `apps/attention-router` to `packages/pr-attention-router`. This mirrors the current P3SG monorepo boundary (`apps/website`, `packages/pr-attention-router`, and `config/pr-attention-router`) while retaining this repository's requested adapter path, `pr-attention-router/`. The package contains generic CLIs, policy evaluation, enforcement, rendering, GitHub helpers, notification adapters, prompt/schema assets, and `node:test` suites; `pr-attention-router/` contains only this repository's policy, conformance cases, and host context. The dashboard consumes the package's public types/renderers but owns no routing behavior, and GitHub Actions call the trusted package and adapter directly rather than running through the dashboard. Only the email job installs runtime dependencies.
+**Architecture:** A private root npm workspace owns the canonical lockfile and links `apps/par-dashboard` to `packages/pr-attention-router`. This mirrors the current P3SG monorepo boundary (`apps/website`, `packages/pr-attention-router`, and `config/pr-attention-router`) while retaining this repository's requested adapter path, `config/pr-attention-router/`. The package contains generic CLIs, policy evaluation, enforcement, rendering, GitHub helpers, notification adapters, prompt/schema assets, and `node:test` suites; `config/pr-attention-router/` contains only this repository's policy, conformance cases, and host context. The dashboard consumes the package's public types/renderers but owns no routing behavior, and GitHub Actions call the trusted package and adapter directly rather than running through the dashboard. Only the email job installs runtime dependencies.
 
 **Tech Stack:** Node.js 22.18+, npm workspaces, TypeScript 5.9 with native type stripping, `node:test`, React 19, Vite 7, Vitest, YAML, Nodemailer 10, GitHub Actions.
 
@@ -41,36 +41,36 @@
 
 | Current path | Target path | Internal change |
 | --- | --- | --- |
-| `apps/attention-router/scripts/collectPullRequestEvidence.ts` | `packages/pr-attention-router/cli/collectPullRequestEvidence.ts` | Add required `--policy`; load policy and pass it to the engine; use `.ts` imports. |
-| `apps/attention-router/scripts/normalizeClassification.ts` | `packages/pr-attention-router/cli/normalizeClassification.ts` | Use package modules; output comment plus classification, without duplicated long notification text. |
-| `apps/attention-router/scripts/sendAttentionEmail.ts` | `packages/pr-attention-router/cli/sendAttentionEmail.ts` | Use package notification modules and native Node TypeScript. |
-| `apps/attention-router/scripts/sendAttentionSlack.ts` | `packages/pr-attention-router/cli/sendAttentionSlack.ts` | Use package notification modules and native `fetch`. |
+| `apps/par-dashboard/scripts/collectPullRequestEvidence.ts` | `packages/pr-attention-router/cli/collectPullRequestEvidence.ts` | Add required `--policy`; load policy and pass it to the engine; use `.ts` imports. |
+| `apps/par-dashboard/scripts/normalizeClassification.ts` | `packages/pr-attention-router/cli/normalizeClassification.ts` | Use package modules; output comment plus classification, without duplicated long notification text. |
+| `apps/par-dashboard/scripts/sendAttentionEmail.ts` | `packages/pr-attention-router/cli/sendAttentionEmail.ts` | Use package notification modules and native Node TypeScript. |
+| `apps/par-dashboard/scripts/sendAttentionSlack.ts` | `packages/pr-attention-router/cli/sendAttentionSlack.ts` | Use package notification modules and native `fetch`. |
 | none | `packages/pr-attention-router/cli/checkPolicy.ts` | Load host policy/cases, print failures, exit nonzero. |
 | none | `packages/pr-attention-router/cli/checkWorkflow.ts` | Parse and enforce the workflow trust contract. |
-| `apps/attention-router/src/domain/attention.ts` | `packages/pr-attention-router/lib/attention.ts` | Move only `RiskTier` and `ReviewerType`; keep dashboard-only interfaces in the app. |
-| `apps/attention-router/src/router/commentState.ts` | `packages/pr-attention-router/lib/commentState.ts` | Change imports to `.ts`. |
-| `apps/attention-router/src/router/enforceClassification.ts` | `packages/pr-attention-router/lib/enforceClassification.ts` | Change imports to `.ts`; retain floor enforcement and prohibited-authority checks. |
-| `apps/attention-router/src/router/evaluateDeterministicFloor.ts` | `packages/pr-attention-router/lib/evaluateDeterministicFloor.ts` | Remove all hard-coded paths; accept `DeterministicPolicy`; collect all signals; return `matchedRuleIds`. |
-| `apps/attention-router/src/router/parseGitDiff.ts` | `packages/pr-attention-router/lib/parseGitDiff.ts` | Change imports/exports for native TypeScript. |
-| `apps/attention-router/src/router/renderClassification.ts` | `packages/pr-attention-router/lib/renderClassification.ts` | Add three-line `renderNotificationSummary`; keep detailed comment renderer. |
+| `apps/par-dashboard/src/domain/attention.ts` | `packages/pr-attention-router/lib/attention.ts` | Move only `RiskTier` and `ReviewerType`; keep dashboard-only interfaces in the app. |
+| `apps/par-dashboard/src/router/commentState.ts` | `packages/pr-attention-router/lib/commentState.ts` | Change imports to `.ts`. |
+| `apps/par-dashboard/src/router/enforceClassification.ts` | `packages/pr-attention-router/lib/enforceClassification.ts` | Change imports to `.ts`; retain floor enforcement and prohibited-authority checks. |
+| `apps/par-dashboard/src/router/evaluateDeterministicFloor.ts` | `packages/pr-attention-router/lib/evaluateDeterministicFloor.ts` | Remove all hard-coded paths; accept `DeterministicPolicy`; collect all signals; return `matchedRuleIds`. |
+| `apps/par-dashboard/src/router/parseGitDiff.ts` | `packages/pr-attention-router/lib/parseGitDiff.ts` | Change imports/exports for native TypeScript. |
+| `apps/par-dashboard/src/router/renderClassification.ts` | `packages/pr-attention-router/lib/renderClassification.ts` | Add three-line `renderNotificationSummary`; keep detailed comment renderer. |
 | none | `packages/pr-attention-router/lib/deterministicPolicy.ts` | Define host-neutral policy interfaces. |
 | none | `packages/pr-attention-router/lib/loadPolicy.ts` | Parse and validate version 1 policy JSON. |
 | none | `packages/pr-attention-router/lib/policyCases.ts` | Parse and execute host conformance cases, including built-in evidence overrides. |
 | none | `packages/pr-attention-router/lib/checkWorkflowContract.ts` | Parse YAML and enforce trust invariants. |
 | none | `packages/pr-attention-router/lib/index.ts` | Export the dashboard's supported type/rendering API. |
-| `apps/attention-router/src/notifications/emailNotification.ts` | `packages/pr-attention-router/lib/emailNotification.ts` | Use `renderNotificationSummary`; first line is the subject. |
-| `apps/attention-router/src/notifications/slackNotification.ts` | `packages/pr-attention-router/lib/slackNotification.ts` | Use the same three-line summary. |
-| `apps/attention-router/src/notifications/smtpEmailTransport.ts` | `packages/pr-attention-router/lib/smtpEmailTransport.ts` | Retain injectable Nodemailer client; upgrade runtime to 10.x. |
+| `apps/par-dashboard/src/notifications/emailNotification.ts` | `packages/pr-attention-router/lib/emailNotification.ts` | Use `renderNotificationSummary`; first line is the subject. |
+| `apps/par-dashboard/src/notifications/slackNotification.ts` | `packages/pr-attention-router/lib/slackNotification.ts` | Use the same three-line summary. |
+| `apps/par-dashboard/src/notifications/smtpEmailTransport.ts` | `packages/pr-attention-router/lib/smtpEmailTransport.ts` | Retain injectable Nodemailer client; upgrade runtime to 10.x. |
 | `.github/scripts/read-pr-material-context.js` | `packages/pr-attention-router/lib/readPrMaterialContext.cjs` | Rename to `.cjs`; behavior unchanged. |
 | `.github/scripts/publish-attention.comment.js` | `packages/pr-attention-router/lib/publishAttentionComment.cjs` | Rename to `.cjs`; behavior unchanged. |
 | `.github/attention-router/classification-prompt.md` | `packages/pr-attention-router/lib/classification-prompt.md` | Make stack-neutral; identify PR content/instructions as untrusted evidence. |
 | `.github/attention-router/classification.schema.json` | `packages/pr-attention-router/lib/classification.schema.json` | Move unchanged unless path-independent wording is found. |
-| `apps/attention-router/src/__tests__/router/*.spec.ts` | `packages/pr-attention-router/test/*.test.ts` | Convert from Vitest to `node:test`; use generic fixtures. |
-| `apps/attention-router/src/__tests__/notifications/*.spec.ts` | `packages/pr-attention-router/test/*.test.ts` | Convert spies/assertions to `node:test` and `node:assert/strict`. |
-| `apps/attention-router/src/__tests__/router/workflowPermissions.spec.ts` | `packages/pr-attention-router/test/checkWorkflowContract.test.ts` | Replace regex assertion with YAML contract tests. |
-| none | `pr-attention-router/policy.json` | Add 3 HIGH and 5 MEDIUM host rules plus existing thresholds. |
-| none | `pr-attention-router/policy-cases.json` | Add exactly 12 focused conformance cases. |
-| none | `pr-attention-router/host-context.md` | Describe this POC, dashboard, validation, and known evidence gaps. |
+| `apps/par-dashboard/src/__tests__/router/*.spec.ts` | `packages/pr-attention-router/test/*.test.ts` | Convert from Vitest to `node:test`; use generic fixtures. |
+| `apps/par-dashboard/src/__tests__/notifications/*.spec.ts` | `packages/pr-attention-router/test/*.test.ts` | Convert spies/assertions to `node:test` and `node:assert/strict`. |
+| `apps/par-dashboard/src/__tests__/router/workflowPermissions.spec.ts` | `packages/pr-attention-router/test/checkWorkflowContract.test.ts` | Replace regex assertion with YAML contract tests. |
+| none | `config/pr-attention-router/policy.json` | Add 3 HIGH and 5 MEDIUM host rules plus existing thresholds. |
+| none | `config/pr-attention-router/policy-cases.json` | Add exactly 12 focused conformance cases. |
+| none | `config/pr-attention-router/host-context.md` | Describe this POC, dashboard, validation, and known evidence gaps. |
 
 ## Risks and Mitigations
 
@@ -99,8 +99,8 @@
 - Create: `packages/pr-attention-router/lib/index.ts`
 - Create: `packages/pr-attention-router/test/renderClassification.test.ts`
 - Create: `packages/pr-attention-router/test/enforceClassification.test.ts`
-- Modify: `apps/attention-router/package.json`
-- Delete: `apps/attention-router/package-lock.json`
+- Modify: `apps/par-dashboard/package.json`
+- Delete: `apps/par-dashboard/package-lock.json`
 
 **Interfaces:**
 - Consumes: Current `RiskTier`, `ReviewerType`, enforcement, and rendering behavior from the app.
@@ -138,7 +138,7 @@ Root `package.json`:
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "check:router": "npm run check --workspace @scope/pr-attention-router && npm run check:policy --workspace @scope/pr-attention-router -- --policy ../../pr-attention-router/policy.json --cases ../../pr-attention-router/policy-cases.json && npm run check:workflow --workspace @scope/pr-attention-router -- --workflow ../../.github/workflows/pr-attention-review.yml"
+    "check:router": "npm run check --workspace @scope/pr-attention-router && npm run check:policy --workspace @scope/pr-attention-router -- --policy ../../config/pr-attention-router/policy.json --cases ../../config/pr-attention-router/policy-cases.json && npm run check:workflow --workspace @scope/pr-attention-router -- --workflow ../../.github/workflows/pr-attention-review.yml"
   }
 }
 ```
@@ -234,7 +234,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit the package foundation**
 
 ```bash
-git add package.json package-lock.json packages/pr-attention-router apps/attention-router/package.json apps/attention-router/package-lock.json
+git add package.json package-lock.json packages/pr-attention-router apps/par-dashboard/package.json apps/par-dashboard/package-lock.json
 git commit -m "refactor: establish attention router workspace package"
 ```
 
@@ -354,9 +354,9 @@ git commit -m "refactor: make attention floors policy driven"
 - Create: `packages/pr-attention-router/lib/policyCases.ts`
 - Create: `packages/pr-attention-router/cli/checkPolicy.ts`
 - Create: `packages/pr-attention-router/test/policyCases.test.ts`
-- Create: `pr-attention-router/policy.json`
-- Create: `pr-attention-router/policy-cases.json`
-- Create: `pr-attention-router/host-context.md`
+- Create: `config/pr-attention-router/policy.json`
+- Create: `config/pr-attention-router/policy-cases.json`
+- Create: `config/pr-attention-router/host-context.md`
 
 **Interfaces:**
 - Consumes: `readPolicyFile` and `evaluateDeterministicFloor` from Task 2.
@@ -396,11 +396,11 @@ Use these IDs and anchored path families:
   "pathRules": [
     { "id": "workflow-automation", "tier": "HIGH", "patterns": ["^\\.github/workflows/"], "rationale": "If CI or attention automation breaks unnoticed, unvalidated changes can pass or pull requests can be misclassified." },
     { "id": "router-package", "tier": "HIGH", "patterns": ["^packages/pr-attention-router/"], "rationale": "If floor enforcement or notification code breaks unnoticed, every classified pull request can receive an unsafe result." },
-    { "id": "router-host-policy", "tier": "HIGH", "patterns": ["^pr-attention-router/"], "rationale": "If repository policy or host context breaks unnoticed, every pull request can receive the wrong deterministic floor or AI context." },
+    { "id": "router-host-policy", "tier": "HIGH", "patterns": ["^config/pr-attention-router/"], "rationale": "If repository policy or host context breaks unnoticed, every pull request can receive the wrong deterministic floor or AI context." },
     { "id": "operational-guidance", "tier": "MEDIUM", "patterns": ["^docs/(?:adr|runbooks|setup)/"], "rationale": "If operational guidance breaks unnoticed, adopters or responders can configure or operate the router incorrectly." },
     { "id": "github-configuration", "tier": "MEDIUM", "patterns": ["^\\.github/(?!workflows/)"], "rationale": "If PR context configuration breaks unnoticed, reviewers can lose the intent evidence needed for a safe LOW result." },
-    { "id": "dashboard-shared-surface", "tier": "MEDIUM", "patterns": ["^apps/attention-router/src/(?:(?:App|main)\\.tsx$|(?:domain|data)/|(?:global|App\\.module)\\.css$)"], "rationale": "If the dashboard shell or shared model breaks unnoticed, every dashboard tier or queue can display incorrect information." },
-    { "id": "build-and-dependencies", "tier": "MEDIUM", "patterns": ["^package(?:-lock)?\\.json$", "^apps/attention-router/(?:package\\.json|tsconfig(?:\\.[^.]+)?\\.json|vite\\.config\\.ts|eslint\\.config\\.js)$"], "rationale": "If build or dependency configuration breaks unnoticed, validation or the production dashboard can diverge for all consumers." },
+    { "id": "dashboard-shared-surface", "tier": "MEDIUM", "patterns": ["^apps/par-dashboard/src/(?:(?:App|main)\\.tsx$|(?:domain|data)/|(?:global|App\\.module)\\.css$)"], "rationale": "If the dashboard shell or shared model breaks unnoticed, every dashboard tier or queue can display incorrect information." },
+    { "id": "build-and-dependencies", "tier": "MEDIUM", "patterns": ["^package(?:-lock)?\\.json$", "^apps/par-dashboard/(?:package\\.json|tsconfig(?:\\.[^.]+)?\\.json|vite\\.config\\.ts|eslint\\.config\\.js)$"], "rationale": "If build or dependency configuration breaks unnoticed, validation or the production dashboard can diverge for all consumers." },
     { "id": "agent-instructions", "tier": "MEDIUM", "patterns": ["^AGENTS\\.md$"], "rationale": "If repository instructions break unnoticed, every coding agent can operate under the wrong safety or workflow contract." }
   ],
   "productionFilePattern": "\\.(?:[cm]?[jt]sx?|css|html)$",
@@ -419,14 +419,14 @@ Cases:
 
 1. `.github/workflows/pr-attention-review.yml` → HIGH, `workflow-automation`, not `github-configuration`.
 2. `packages/pr-attention-router/lib/enforceClassification.ts` → HIGH, `router-package`.
-3. `pr-attention-router/policy.json` → HIGH, `router-host-policy`.
+3. `config/pr-attention-router/policy.json` → HIGH, `router-host-policy`.
 4. `docs/runbooks/pr-attention-notification.md` → MEDIUM, `operational-guidance`.
-5. `apps/attention-router/src/components/TierCard.tsx` → LOW.
+5. `apps/par-dashboard/src/components/TierCard.tsx` → LOW.
 6. `archive/.github/workflows/validate.yml` → LOW, not `workflow-automation` or `github-configuration`.
 7. TierCard with `validationStatus: FAILED` → MEDIUM.
 8. TierCard with `materialContext: MISSING` → MEDIUM.
 9. TierCard with `materialContext: CONFLICTING` → MEDIUM.
-10. `apps/attention-router/src/__tests__/App.spec.tsx` with `status: DELETED` → MEDIUM.
+10. `apps/par-dashboard/src/__tests__/App.spec.tsx` with `status: DELETED` → MEDIUM.
 11. Five existing leaf component/stylesheet paths → MEDIUM from production breadth.
 12. TierCard with `changedLines: 250` → MEDIUM.
 
@@ -437,7 +437,7 @@ Cases:
 Run:
 
 ```bash
-npm run check:policy --workspace @scope/pr-attention-router -- --policy ../../pr-attention-router/policy.json --cases ../../pr-attention-router/policy-cases.json
+npm run check:policy --workspace @scope/pr-attention-router -- --policy ../../config/pr-attention-router/policy.json --cases ../../config/pr-attention-router/policy-cases.json
 git diff --check
 ```
 
@@ -463,11 +463,11 @@ git commit -m "feat: add repository attention policy adapter"
 - Create: `packages/pr-attention-router/test/emailNotification.test.ts`
 - Create: `packages/pr-attention-router/test/slackNotification.test.ts`
 - Create: `packages/pr-attention-router/test/smtpEmailTransport.test.ts`
-- Modify: `apps/attention-router/package.json`
-- Modify: `apps/attention-router/tsconfig.node.json`
-- Delete: `apps/attention-router/scripts/*.ts`
-- Delete: `apps/attention-router/src/notifications/*.ts`
-- Delete: `apps/attention-router/src/__tests__/notifications/*.spec.ts`
+- Modify: `apps/par-dashboard/package.json`
+- Modify: `apps/par-dashboard/tsconfig.node.json`
+- Delete: `apps/par-dashboard/scripts/*.ts`
+- Delete: `apps/par-dashboard/src/notifications/*.ts`
+- Delete: `apps/par-dashboard/src/__tests__/notifications/*.spec.ts`
 
 **Interfaces:**
 - Consumes: policy loader/engine, enforcement, and renderers from Tasks 1–3.
@@ -509,18 +509,18 @@ Remove `nodemailer`, `@types/nodemailer`, and `tsx` from the app manifest. Keep 
 ```bash
 npm install --package-lock-only --ignore-scripts
 npm run check --workspace @scope/pr-attention-router
-npm run lint --workspace attention-router-poc
-npm run typecheck --workspace attention-router-poc
-npm test --workspace attention-router-poc
+npm run lint --workspace par-dashboard
+npm run typecheck --workspace par-dashboard
+npm test --workspace par-dashboard
 git diff --check
 ```
 
-Expected: PASS, with no `apps/attention-router/scripts` or app notification modules remaining.
+Expected: PASS, with no `apps/par-dashboard/scripts` or app notification modules remaining.
 
 - [ ] **Step 6: Commit notifications and CLIs**
 
 ```bash
-git add package-lock.json packages/pr-attention-router apps/attention-router/package.json apps/attention-router/tsconfig.node.json apps/attention-router/scripts apps/attention-router/src/notifications apps/attention-router/src/__tests__/notifications
+git add package-lock.json packages/pr-attention-router apps/par-dashboard/package.json apps/par-dashboard/tsconfig.node.json apps/par-dashboard/scripts apps/par-dashboard/src/notifications apps/par-dashboard/src/__tests__/notifications
 git commit -m "refactor: move router operations into package"
 ```
 
@@ -589,7 +589,7 @@ Expected: package tests pass and both old directories are absent.
 - [ ] **Step 5: Commit GitHub asset extraction**
 
 ```bash
-git add packages/pr-attention-router .github/scripts .github/attention-router apps/attention-router/src/__tests__/router
+git add packages/pr-attention-router .github/scripts .github/attention-router apps/par-dashboard/src/__tests__/router
 git commit -m "refactor: package trusted GitHub router assets"
 ```
 
@@ -599,7 +599,7 @@ git commit -m "refactor: package trusted GitHub router assets"
 - Create: `packages/pr-attention-router/lib/checkWorkflowContract.ts`
 - Create: `packages/pr-attention-router/cli/checkWorkflow.ts`
 - Create: `packages/pr-attention-router/test/checkWorkflowContract.test.ts`
-- Delete: `apps/attention-router/src/__tests__/router/workflowPermissions.spec.ts`
+- Delete: `apps/par-dashboard/src/__tests__/router/workflowPermissions.spec.ts`
 
 **Interfaces:**
 - Consumes: YAML source text.
@@ -647,7 +647,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit the trust contract**
 
 ```bash
-git add packages/pr-attention-router apps/attention-router/src/__tests__/router/workflowPermissions.spec.ts
+git add packages/pr-attention-router apps/par-dashboard/src/__tests__/router/workflowPermissions.spec.ts
 git commit -m "test: enforce attention workflow trust contract"
 ```
 
@@ -666,7 +666,7 @@ git commit -m "test: enforce attention workflow trust contract"
 ```yaml
 env:
   PAR_ROUTER: packages/pr-attention-router
-  PAR_ADAPTER: pr-attention-router
+  PAR_ADAPTER: config/pr-attention-router
 ```
 
 Change every trusted checkout to `ref: ${{ github.sha }}` and keep `persist-credentials: false`.
@@ -738,13 +738,13 @@ git commit -m "refactor: run attention workflow from package"
 ## Task 8: Convert the dashboard into a package client and remove routing logic
 
 **Files:**
-- Modify: `apps/attention-router/src/domain/attention.ts`
-- Create: `apps/attention-router/src/domain/sampleClassification.ts`
-- Modify: `apps/attention-router/src/components/EvidencePanel.tsx`
-- Modify: `apps/attention-router/src/components/EvidencePanel.module.css`
-- Modify: `apps/attention-router/src/__tests__/App.spec.tsx`
-- Delete: `apps/attention-router/src/router/*.ts`
-- Delete: migrated `apps/attention-router/src/__tests__/router/*.spec.ts`
+- Modify: `apps/par-dashboard/src/domain/attention.ts`
+- Create: `apps/par-dashboard/src/domain/sampleClassification.ts`
+- Modify: `apps/par-dashboard/src/components/EvidencePanel.tsx`
+- Modify: `apps/par-dashboard/src/components/EvidencePanel.module.css`
+- Modify: `apps/par-dashboard/src/__tests__/App.spec.tsx`
+- Delete: `apps/par-dashboard/src/router/*.ts`
+- Delete: migrated `apps/par-dashboard/src/__tests__/router/*.spec.ts`
 
 **Interfaces:**
 - Consumes: approved package root exports from Task 1.
@@ -795,7 +795,7 @@ Before deletion, confirm every behavior test has a package equivalent. Remove `s
 Run:
 
 ```bash
-rg -n "evaluateDeterministicFloor|enforceClassification|createSmtpEmailTransport|createSlackBotTransport" apps/attention-router
+rg -n "evaluateDeterministicFloor|enforceClassification|createSmtpEmailTransport|createSlackBotTransport" apps/par-dashboard
 ```
 
 Expected: no matches.
@@ -803,10 +803,10 @@ Expected: no matches.
 Then run:
 
 ```bash
-npm run lint --workspace attention-router-poc
-npm run typecheck --workspace attention-router-poc
-npm test --workspace attention-router-poc
-npm run build --workspace attention-router-poc
+npm run lint --workspace par-dashboard
+npm run typecheck --workspace par-dashboard
+npm test --workspace par-dashboard
+npm run build --workspace par-dashboard
 git diff --check
 ```
 
@@ -815,7 +815,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit dashboard decoupling**
 
 ```bash
-git add apps/attention-router packages/pr-attention-router/lib/index.ts
+git add apps/par-dashboard packages/pr-attention-router/lib/index.ts
 git commit -m "refactor: make dashboard a router package client"
 ```
 
@@ -844,8 +844,8 @@ npm ci --ignore-scripts \
   --include-workspace-root=false
 npm run check --workspace @scope/pr-attention-router
 npm run check:policy --workspace @scope/pr-attention-router -- \
-  --policy ../../pr-attention-router/policy.json \
-  --cases ../../pr-attention-router/policy-cases.json
+  --policy ../../config/pr-attention-router/policy.json \
+  --cases ../../config/pr-attention-router/policy-cases.json
 npm run check:workflow --workspace @scope/pr-attention-router -- \
   --workflow ../../.github/workflows/pr-attention-review.yml
 ```
@@ -854,7 +854,7 @@ Add a Node assertion from the package directory that `import.meta.resolve('react
 
 - [ ] **Step 3: Add the dashboard job**
 
-Use a complete root `npm ci --ignore-scripts`, then run app lint, typecheck, tests, and build through `--workspace attention-router-poc`. Do not run router checks again in this job.
+Use a complete root `npm ci --ignore-scripts`, then run app lint, typecheck, tests, and build through `--workspace par-dashboard`. Do not run router checks again in this job.
 
 - [ ] **Step 4: Keep whitespace validation deterministic**
 
@@ -865,10 +865,10 @@ Run `git diff --check "$BASE_SHA" "$HEAD_SHA"` in both jobs only if each job mus
 ```bash
 npm ci --ignore-scripts
 npm run check:router
-npm run lint --workspace attention-router-poc
-npm run typecheck --workspace attention-router-poc
-npm test --workspace attention-router-poc
-npm run build --workspace attention-router-poc
+npm run lint --workspace par-dashboard
+npm run typecheck --workspace par-dashboard
+npm test --workspace par-dashboard
+npm run build --workspace par-dashboard
 git diff --check
 ```
 
@@ -900,7 +900,7 @@ git commit -m "ci: validate router independently from dashboard"
 Document:
 
 - copy or workspace-link `packages/pr-attention-router`;
-- create root-level `pr-attention-router/{policy.json,policy-cases.json,host-context.md}`;
+- create root-level `config/pr-attention-router/{policy.json,policy-cases.json,host-context.md}`;
 - wire `PAR_ROUTER` and `PAR_ADAPTER`;
 - run the four router checks;
 - keep one policy per repository with app-prefixed rules in monorepos;
@@ -927,7 +927,7 @@ All counts remain below the review targets; no exception is required.
 - [ ] **Step 5: Check documentation and commit**
 
 ```bash
-rg -n "apps/attention-router/(scripts|src/router|src/notifications)|\.github/(scripts|attention-router)|tsx" README.md docs AGENTS.md SESSION-LOG.md
+rg -n "apps/par-dashboard/(scripts|src/router|src/notifications)|\.github/(scripts|attention-router)|tsx" README.md docs AGENTS.md SESSION-LOG.md
 git diff --check
 ```
 
@@ -963,13 +963,13 @@ Expected: manifest assertion passes and source search has no browser-framework d
 test -d packages/pr-attention-router/cli
 test -d packages/pr-attention-router/lib
 test -d packages/pr-attention-router/test
-test -f pr-attention-router/policy.json
+test -f config/pr-attention-router/policy.json
 test ! -e .github/scripts
 test ! -e .github/attention-router
-test ! -e apps/attention-router/src/router
-test ! -e apps/attention-router/src/notifications
-test ! -e apps/attention-router/scripts
-test ! -e apps/attention-router/package-lock.json
+test ! -e apps/par-dashboard/src/router
+test ! -e apps/par-dashboard/src/notifications
+test ! -e apps/par-dashboard/scripts
+test ! -e apps/par-dashboard/package-lock.json
 ```
 
 Expected: all assertions pass.
@@ -979,10 +979,10 @@ Expected: all assertions pass.
 ```bash
 npm ci --ignore-scripts
 npm run check:router
-npm run lint --workspace attention-router-poc
-npm run typecheck --workspace attention-router-poc
-npm test --workspace attention-router-poc
-npm run build --workspace attention-router-poc
+npm run lint --workspace par-dashboard
+npm run typecheck --workspace par-dashboard
+npm test --workspace par-dashboard
+npm run build --workspace par-dashboard
 git diff --check
 git status --short
 ```

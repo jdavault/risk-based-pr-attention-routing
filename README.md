@@ -149,21 +149,21 @@ Persistent PR comment
 Human review and decision
 ```
 
-The workflows run separately:
+The workflows and workspaces stay separate:
 
-- `Validate repository` runs linting, type-checking, tests, a production build,
-  and whitespace validation.
-- `PR Attention Review` runs after validation succeeds or fails, so failed
-  validation can raise the deterministic floor. It collects evidence, requests
-  structured read-only Codex judgment, enforces the floor, and updates one
-  persistent PR comment.
-- `Local runner smoke test` verifies the self-hosted runner independently of
-  the application.
+- `Validate repository` checks whitespace once, validates
+  `packages/pr-attention-router` without installing React, and validates the
+  `apps/par-dashboard` client in a separate job.
+- `PR Attention Review` runs after validation succeeds, fails, or times out.
+  It loads trusted code from the package, loads host rules from
+  `config/pr-attention-router`, requests structured read-only Codex judgment,
+  enforces the floor, and updates one persistent PR comment.
+- `apps/par-dashboard` imports only the package's public types and comment
+  renderer. It contains no routing, policy, GitHub, email, or Slack logic.
 
-The personal POC runs on a self-hosted macOS ARM64 runner. Codex uses the
-action’s built-in `read-only` safety strategy. The eventual work-repository
-integration must use its approved enterprise runner and credential controls
-rather than copying local-runner lifecycle choices.
+The POC runs on GitHub-hosted `ubuntu-24.04` runners with Node 24. Codex uses
+the action's built-in `read-only` safety strategy. A retired local-runner
+runbook remains only as diagnostic history.
 
 ## Notifications
 
@@ -177,6 +177,8 @@ failures do not block publication of the PR comment.
 - Slack uses `SLACK_BOT_TOKEN`, `PAR_SLACK_CHANNEL_ID`, and the Web API
   `chat.postMessage` method.
 - `PAR_EMAIL_ENABLED` and `PAR_SLACK_ENABLED` independently gate delivery.
+- Both channels receive only tier/title, reviewer and floor, and the PR URL;
+  detailed reasoning remains in the persistent comment.
 
 Notifications do not grant approval, merge, deployment, release, or source
 modification authority.
@@ -212,18 +214,14 @@ The standalone React and TypeScript app provides controlled LOW, MEDIUM, and
 HIGH examples for local testing.
 
 ```bash
-cd apps/par-dashboard
-npm ci
-npm run dev -- --port 5157
+npm ci --ignore-scripts
+npm run dev --workspace par-dashboard -- --port 5157
 ```
 
 Then open <http://localhost:5157>. Useful checks are:
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
+npm run check
 ```
 
 ## Documentation

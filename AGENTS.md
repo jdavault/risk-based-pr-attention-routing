@@ -23,23 +23,22 @@
 
 ## Current Focus
 
-- Validate the installation contract in the personal P3 Solutions Group
-  website and SmartBites mobile repositories before adapting the approach to
-  work repositories.
-- Use
-  [the Claude integration handoff](docs/handoffs/2026-10-04-claude-integration-handoff.md)
-  for the next session.
+- Validate PR #11, which extracts the application-independent router into
+  `packages/pr-attention-router`, keeps host policy in
+  `config/pr-attention-router`, and makes `apps/par-dashboard` an optional
+  UI-only client.
+- After merge, open an acceptance PR to test the new default-branch
+  `workflow_run` orchestration end to end.
 
 ## Session Log
 
 ### Session 2026-10-04
 
-- Branch: `docs/add-installation-guide`
-- Focus: Complete and validate the hosted PR Attention Router POC.
-- Completed: Hosted Ubuntu workflows; deterministic floor enforcement; Codex
-  classification; persistent comment; SMTP and Slack delivery; Node 24 action
-  upgrades; README, runbooks, dashboard image, and installation guide.
-- In Progress: PR #10 contains the installation guide and final handoff and
-  must be validated and squash-merged.
-- Next Session: Install and compare the router in the P3 Solutions Group
-  website and SmartBites mobile application using the handoff prompt.
+- Branch: `refactor/extract-pr-attention-router`
+- Focus: Complete and validate the application-independent package boundary.
+- Completed: Package extraction, host policy adapter, executable workflow
+  trust contract, P3-aligned workflow wiring, isolated CI jobs, and dashboard
+  rename/decoupling.
+- In Progress: PR #11 hosted validation and post-merge acceptance testing.
+- Next: Verify package/policy/dashboard checks, merge only after owner review,
+  then exercise the landed workflow with a harmless classification PR.
