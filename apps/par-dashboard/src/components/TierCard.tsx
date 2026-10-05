@@ -10,6 +10,7 @@ interface TierCardProps {
   readonly onSelect: (tier: RiskTier) => void;
 }
 
+// Acceptance probe: a component-local comment should retain the LOW floor.
 export function TierCard({
   definition,
   count,
