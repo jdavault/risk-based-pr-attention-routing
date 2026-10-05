@@ -13,7 +13,9 @@ describe('App', () => {
     expect(
       screen.getByText('Route attention first; automate later.'),
     ).toBeVisible();
-    expect(screen.getByText(/classification only/i)).toBeVisible();
+    expect(
+      screen.getByText('Proof of concept • Classification only.'),
+    ).toBeVisible();
     expect(screen.getByText('Human authority preserved')).toBeVisible();
   });
 
@@ -52,5 +54,25 @@ describe('App', () => {
       }),
     ).toBeVisible();
     expect(screen.getByText('Tech Lead or relevant SME')).toBeVisible();
+  });
+
+  it('previews the detailed persistent comment for the selected tier', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /Protect reviewer authorization policy/u,
+      }),
+    );
+    await user.click(
+      screen.getByText('Persistent PR comment preview'),
+    );
+
+    const preview = screen.getByText(/## PR Attention Review — HIGH/u);
+    expect(preview).toHaveTextContent(
+      '**Reviewer:** Tech Lead or relevant SME',
+    );
+    expect(preview).not.toHaveTextContent('[object Object]');
   });
 });

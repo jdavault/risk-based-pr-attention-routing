@@ -1,6 +1,8 @@
 import type { ReactElement } from 'react';
+import { renderClassificationComment } from '@scope/pr-attention-router';
 
 import type { RiskDimension, SamplePullRequest } from '../domain/attention';
+import { toSampleClassification } from '../domain/sampleClassification';
 import styles from './EvidencePanel.module.css';
 
 interface EvidencePanelProps {
@@ -27,6 +29,10 @@ function Dimension({ label, dimension }: DimensionProps): ReactElement {
 export function EvidencePanel({
   pullRequest,
 }: EvidencePanelProps): ReactElement {
+  const comment = renderClassificationComment(
+    toSampleClassification(pullRequest),
+  );
+
   return (
     <aside className={styles.panel} aria-labelledby="evidence-heading">
       <p className={styles.eyebrow}>Why this tier?</p>
@@ -60,6 +66,11 @@ export function EvidencePanel({
           </ul>
         )}
       </section>
+
+      <details className={styles.commentPreview}>
+        <summary>Persistent PR comment preview</summary>
+        <pre>{comment}</pre>
+      </details>
     </aside>
   );
 }

@@ -1,5 +1,9 @@
-export type RiskTier = 'LOW' | 'MEDIUM' | 'HIGH';
-export type ReviewerType = 'NON_LEAD_DEVELOPER' | 'TECH_LEAD_OR_SME';
+import type {
+  ReviewerType,
+  RiskTier,
+} from '@scope/pr-attention-router';
+
+export type { ReviewerType, RiskTier };
 
 export interface RiskDimension {
   readonly level: 'Low' | 'Moderate' | 'High';
