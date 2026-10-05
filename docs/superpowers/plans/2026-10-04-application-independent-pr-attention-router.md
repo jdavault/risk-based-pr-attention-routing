@@ -4,7 +4,7 @@
 
 **Goal:** Extract the classification-only PR Attention Router into an application-independent npm workspace package with repository-owned policy data, leaving the Vite dashboard as a tested client.
 
-**Architecture:** A private root npm workspace owns the canonical lockfile and links `apps/attention-router` to `packages/pr-attention-router`. The package contains generic CLIs, policy evaluation, enforcement, rendering, GitHub helpers, notification adapters, prompt/schema assets, and `node:test` suites; `pr-attention-router/` contains only this repository's policy, conformance cases, and host context. GitHub Actions execute trusted package source directly with Node 22.18+, while only the email job installs runtime dependencies.
+**Architecture:** A private root npm workspace owns the canonical lockfile and links `apps/attention-router` to `packages/pr-attention-router`. This mirrors the current P3SG monorepo boundary (`apps/website`, `packages/pr-attention-router`, and `config/pr-attention-router`) while retaining this repository's requested adapter path, `pr-attention-router/`. The package contains generic CLIs, policy evaluation, enforcement, rendering, GitHub helpers, notification adapters, prompt/schema assets, and `node:test` suites; `pr-attention-router/` contains only this repository's policy, conformance cases, and host context. The dashboard consumes the package's public types/renderers but owns no routing behavior, and GitHub Actions call the trusted package and adapter directly rather than running through the dashboard. Only the email job installs runtime dependencies.
 
 **Tech Stack:** Node.js 22.18+, npm workspaces, TypeScript 5.9 with native type stripping, `node:test`, React 19, Vite 7, Vitest, YAML, Nodemailer 10, GitHub Actions.
 

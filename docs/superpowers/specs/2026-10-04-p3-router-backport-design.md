@@ -2,8 +2,14 @@
 
 **Status:** Revised for owner review, 2026-10-04
 **Date:** 2026-10-04
-**Reference implementation:** `/Users/davauj2/code/p3-solutions-group/p3sg-website/tools/pr-attention-router`
+**Reference implementation:** `/Users/davauj2/code/p3-solutions-group/p3sg-website/packages/pr-attention-router`
 **Target repository:** `/Users/davauj2/code/sandbox/risk-based-pr-attention-routing`
+
+The reference repository is a Turborepo/npm-workspaces monorepo. Its reusable
+engine lives in `packages/pr-attention-router`, its repository-specific adapter
+lives in `config/pr-attention-router`, and `apps/website` remains a host
+application. This repository follows the same separation while retaining the
+owner-requested root adapter path `pr-attention-router/`.
 
 ## Purpose
 
@@ -123,6 +129,9 @@ sample data, React components, CSS, Vitest, and Vite remain in the app.
 The dashboard may adapt a synthetic pull request into a
 `FinalClassification` to show a persistent-comment preview. That adapter is
 presentation code; it cannot evaluate a deterministic floor or enforce a tier.
+The workflow addresses the package and host adapter directly; it never runs
+through the dashboard. Removing the dashboard must not break package checks or
+the PR workflow.
 
 The app no longer contains:
 
