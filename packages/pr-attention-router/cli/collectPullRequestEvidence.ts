@@ -5,13 +5,15 @@ import {
   type MaterialContextState,
   type PullRequestEvidence,
   type ValidationStatus,
-} from '../src/router/evaluateDeterministicFloor';
-import { parseNameStatus, parseNumstat } from '../src/router/parseGitDiff';
+} from '../lib/evaluateDeterministicFloor.ts';
+import { readPolicyFile } from '../lib/loadPolicy.ts';
+import { parseNameStatus, parseNumstat } from '../lib/parseGitDiff.ts';
 
 interface CollectorArguments {
   readonly base: string;
   readonly head: string;
   readonly repositoryDirectory: string;
+  readonly policyPath: string;
   readonly title: string;
   readonly body: string;
   readonly jiraReference: string | undefined;
@@ -58,12 +60,11 @@ function parseArguments(): CollectorArguments {
     base: requireOption('base'),
     head: requireOption('head'),
     repositoryDirectory: requireOption('repository-directory'),
+    policyPath: requireOption('policy'),
     title: requireOption('title'),
     body: readOption('body') ?? '',
     jiraReference: readOption('jira-reference'),
-    materialContext: parseMaterialContextState(
-      requireOption('material-context'),
-    ),
+    materialContext: parseMaterialContextState(requireOption('material-context')),
     validationStatus: parseValidationStatus(requireOption('validation-status')),
   };
 }
@@ -109,17 +110,11 @@ function collectEvidence(options: CollectorArguments): PullRequestEvidence {
 
 const options = parseArguments();
 const evidence = collectEvidence(options);
-const assessment = evaluateDeterministicFloor(evidence);
+const assessment = evaluateDeterministicFloor(
+  evidence,
+  await readPolicyFile(options.policyPath),
+);
 
 process.stdout.write(
-  `${JSON.stringify(
-    {
-      base: options.base,
-      head: options.head,
-      evidence,
-      assessment,
-    },
-    null,
-    2,
-  )}\n`,
+  `${JSON.stringify({ base: options.base, head: options.head, evidence, assessment }, null, 2)}\n`,
 );

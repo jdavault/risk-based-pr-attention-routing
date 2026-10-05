@@ -3,12 +3,9 @@ import { writeFile } from 'node:fs/promises';
 import {
   enforceClassification,
   parseAiClassification,
-} from '../src/router/enforceClassification';
-import type { DeterministicAssessment } from '../src/router/evaluateDeterministicFloor';
-import {
-  renderClassificationComment,
-  renderNotificationText,
-} from '../src/router/renderClassification';
+} from '../lib/enforceClassification.ts';
+import type { DeterministicAssessment } from '../lib/evaluateDeterministicFloor.ts';
+import { renderClassificationComment } from '../lib/renderClassification.ts';
 
 interface DeterministicEvidenceDocument {
   readonly assessment: DeterministicAssessment;
@@ -21,11 +18,9 @@ function readOption(name: string): string | undefined {
 
 function requireOption(name: string): string {
   const value = readOption(name);
-
   if (value === undefined || value.trim().length === 0) {
     throw new Error(`Missing required ${name} option.`);
   }
-
   return value;
 }
 
@@ -44,14 +39,15 @@ function isDeterministicEvidenceDocument(
     return false;
   }
 
-  const { floor, reviewerType, rationale, missingEvidence } = input.assessment;
-
+  const { floor, reviewerType, rationale, missingEvidence, matchedRuleIds } =
+    input.assessment;
   return (
     (floor === 'LOW' || floor === 'MEDIUM' || floor === 'HIGH') &&
     (reviewerType === 'NON_LEAD_DEVELOPER' ||
       reviewerType === 'TECH_LEAD_OR_SME') &&
     isStringList(rationale) &&
-    isStringList(missingEvidence)
+    isStringList(missingEvidence) &&
+    isStringList(matchedRuleIds)
   );
 }
 
@@ -78,18 +74,9 @@ async function main(): Promise<void> {
   }
 
   const classification = enforceClassification(deterministic.assessment, ai);
-
   await writeFile(
     outputPath,
-    `${JSON.stringify(
-      {
-        classification,
-        commentBody: renderClassificationComment(classification),
-        notificationText: renderNotificationText(classification),
-      },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify({ classification, commentBody: renderClassificationComment(classification) }, null, 2)}\n`,
     'utf8',
   );
 }

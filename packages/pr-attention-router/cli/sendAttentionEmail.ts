@@ -1,10 +1,10 @@
-import type { FinalClassification } from '../src/router/enforceClassification';
+import type { FinalClassification } from '../lib/enforceClassification.ts';
 import {
   sendAttentionEmail,
   type AttentionEmailInput,
   type PullRequestContext,
-} from '../src/notifications/emailNotification';
-import { createSmtpEmailTransport } from '../src/notifications/smtpEmailTransport';
+} from '../lib/emailNotification.ts';
+import { createSmtpEmailTransport } from '../lib/smtpEmailTransport.ts';
 
 function readOption(name: string): string | undefined {
   const optionIndex = process.argv.indexOf(name);
@@ -13,21 +13,17 @@ function readOption(name: string): string | undefined {
 
 function requireOption(name: string): string {
   const value = readOption(name);
-
   if (value === undefined || value.trim().length === 0) {
     throw new Error(`Missing required ${name} option.`);
   }
-
   return value;
 }
 
 function requireEnvironment(name: string): string {
   const value = process.env[name]?.trim();
-
   if (value === undefined || value.length === 0) {
     throw new Error(`Missing required ${name} variable.`);
   }
-
   return value;
 }
 
@@ -40,11 +36,9 @@ function parseRecipients(name: string): readonly string[] {
 
 function parsePort(name: string): number {
   const value = Number.parseInt(requireEnvironment(name), 10);
-
   if (!Number.isInteger(value) || value < 1 || value > 65_535) {
     throw new Error(`${name} must be an integer between 1 and 65535.`);
   }
-
   return value;
 }
 
@@ -57,9 +51,10 @@ function isStringList(value: unknown): value is readonly string[] {
 }
 
 function parseFinalClassification(input: unknown): FinalClassification {
-  const value = isRecord(input) && isRecord(input.classification)
-    ? input.classification
-    : input;
+  const value =
+    isRecord(input) && isRecord(input.classification)
+      ? input.classification
+      : input;
 
   if (
     !isRecord(value) ||
@@ -139,7 +134,6 @@ async function main(): Promise<void> {
       port: parsePort('SMTP_PORT'),
     }),
   );
-
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 

@@ -6,6 +6,8 @@ import type {
 import type { DeterministicPolicy, PathRule } from './deterministicPolicy.ts';
 import type { ChangedFile, DiffTotals } from './parseGitDiff.ts';
 
+export type { DeterministicAssessment } from './attention.ts';
+
 export type MaterialContextState = 'SUFFICIENT' | 'MISSING' | 'CONFLICTING';
 export type ValidationStatus = 'PASSED' | 'FAILED' | 'NOT_RUN';
 

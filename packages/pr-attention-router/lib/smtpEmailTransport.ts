@@ -1,9 +1,6 @@
 import nodemailer from 'nodemailer';
 
-import type {
-  EmailMessage,
-  EmailTransport,
-} from './emailNotification';
+import type { EmailMessage, EmailTransport } from './emailNotification.ts';
 
 export interface SmtpConfiguration {
   readonly host: string;
@@ -26,9 +23,7 @@ export type SmtpClientFactory = (
   configuration: SmtpConfiguration,
 ) => SmtpClient;
 
-function createNodemailerClient(
-  configuration: SmtpConfiguration,
-): SmtpClient {
+function createNodemailerClient(configuration: SmtpConfiguration): SmtpClient {
   const transporter = nodemailer.createTransport({
     host: configuration.host,
     port: configuration.port,
@@ -40,7 +35,6 @@ function createNodemailerClient(
         ...message,
         to: [...message.to],
       });
-
       return { messageId: delivery.messageId };
     },
   };
@@ -71,9 +65,7 @@ export function createSmtpEmailTransport(
     async send(message, idempotencyKey) {
       const delivery = await client.sendMail({
         ...message,
-        headers: {
-          'X-PAR-Idempotency-Key': idempotencyKey,
-        },
+        headers: { 'X-PAR-Idempotency-Key': idempotencyKey },
       });
 
       if (delivery.messageId.trim().length === 0) {

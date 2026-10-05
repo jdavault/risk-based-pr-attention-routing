@@ -1,7 +1,7 @@
-import type { RiskTier } from '../domain/attention';
-import type { FinalClassification } from '../router/enforceClassification';
-import { renderNotificationText } from '../router/renderClassification';
-import type { PullRequestContext } from './emailNotification';
+import type { RiskTier } from './attention.ts';
+import type { FinalClassification } from './enforceClassification.ts';
+import type { PullRequestContext } from './emailNotification.ts';
+import { renderNotificationSummary } from './renderClassification.ts';
 
 export interface AttentionSlackInput {
   readonly classification: FinalClassification;
@@ -40,7 +40,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const defaultHttpClient: SlackHttpClient = async (url, init) => {
   const response = await fetch(url, init);
-
   return {
     status: response.status,
     async json() {
@@ -59,17 +58,14 @@ export function createSlackBotTransport(
 
   return {
     async post(message) {
-      const response = await request(
-        'https://slack.com/api/chat.postMessage',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json; charset=utf-8',
-          },
-          body: JSON.stringify(message),
+      const response = await request('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8',
         },
-      );
+        body: JSON.stringify(message),
+      });
       const payload = await response.json();
 
       if (
@@ -101,7 +97,7 @@ export async function sendAttentionSlack(
 
   const result = await transport.post({
     channel: input.channel,
-    text: `${renderNotificationText(input.classification)}\nPull request: ${input.pullRequest.url}\n`,
+    text: renderNotificationSummary(input.classification, input.pullRequest),
   });
 
   return {

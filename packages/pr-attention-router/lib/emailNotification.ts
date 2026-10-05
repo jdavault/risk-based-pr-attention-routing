@@ -1,6 +1,6 @@
-import type { RiskTier } from '../domain/attention';
-import type { FinalClassification } from '../router/enforceClassification';
-import { renderNotificationText } from '../router/renderClassification';
+import type { RiskTier } from './attention.ts';
+import type { FinalClassification } from './enforceClassification.ts';
+import { renderNotificationSummary } from './renderClassification.ts';
 
 export interface PullRequestContext {
   readonly repository: string;
@@ -74,15 +74,24 @@ export async function sendAttentionEmail(
   );
   requireEmailAddresses([input.from], 'Attention email sender');
 
-  const idempotencyKey = `${input.pullRequest.repository}:${input.pullRequest.number}:${input.classification.tier}`;
+  const text = renderNotificationSummary(
+    input.classification,
+    input.pullRequest,
+  );
+  const subject = text.split('\n', 1)[0];
+
+  if (subject === undefined) {
+    throw new Error('Attention notification subject is unavailable.');
+  }
+
   const result = await transport.send(
     {
       from: input.from,
       to: recipients,
-      subject: `[${input.classification.tier}] PR #${input.pullRequest.number}: ${input.pullRequest.title}`,
-      text: `${renderNotificationText(input.classification)}\nPull request: ${input.pullRequest.url}\n`,
+      subject,
+      text,
     },
-    idempotencyKey,
+    `${input.pullRequest.repository}:${input.pullRequest.number}:${input.classification.tier}`,
   );
 
   return {

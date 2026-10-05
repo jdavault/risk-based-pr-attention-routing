@@ -1,9 +1,9 @@
-import type { FinalClassification } from '../src/router/enforceClassification';
-import type { PullRequestContext } from '../src/notifications/emailNotification';
+import type { FinalClassification } from '../lib/enforceClassification.ts';
+import type { PullRequestContext } from '../lib/emailNotification.ts';
 import {
   createSlackBotTransport,
   sendAttentionSlack,
-} from '../src/notifications/slackNotification';
+} from '../lib/slackNotification.ts';
 
 function readOption(name: string): string | undefined {
   const optionIndex = process.argv.indexOf(name);
@@ -12,21 +12,17 @@ function readOption(name: string): string | undefined {
 
 function requireOption(name: string): string {
   const value = readOption(name);
-
   if (value === undefined || value.trim().length === 0) {
     throw new Error(`Missing required ${name} option.`);
   }
-
   return value;
 }
 
 function requireEnvironment(name: string): string {
   const value = process.env[name]?.trim();
-
   if (value === undefined || value.length === 0) {
     throw new Error(`Missing required ${name} variable.`);
   }
-
   return value;
 }
 
@@ -113,7 +109,6 @@ async function main(): Promise<void> {
     },
     createSlackBotTransport(requireEnvironment('SLACK_BOT_TOKEN')),
   );
-
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
