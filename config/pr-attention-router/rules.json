@@ -1,0 +1,61 @@
+{
+  "rules": [
+    {
+      "id": "ci-workflows",
+      "tier": "HIGH",
+      "paths": [".github/workflows/**"],
+      "why": "If a workflow breaks unnoticed, validation, secret isolation, or attention routing can be bypassed."
+    },
+    {
+      "id": "attention-router-package",
+      "tier": "HIGH",
+      "paths": ["packages/pr-attention-router/**"],
+      "why": "If the router breaks unnoticed, every pull request can receive the wrong floor, comment, or notification."
+    },
+    {
+      "id": "attention-router-config",
+      "tier": "HIGH",
+      "paths": ["config/pr-attention-router/**"],
+      "why": "If the host rules or rubric break unnoticed, repository changes can be systematically misclassified."
+    },
+    {
+      "id": "dashboard-shared-surfaces",
+      "tier": "MEDIUM",
+      "paths": [
+        "apps/par-dashboard/src/{App,main}.tsx",
+        "apps/par-dashboard/src/{domain,data}/**",
+        "apps/par-dashboard/src/{global,App.module}.css"
+      ],
+      "why": "If the dashboard shell, shared model, or sample data breaks unnoticed, multiple views can explain the routing model incorrectly."
+    },
+    {
+      "id": "dashboard-build",
+      "tier": "MEDIUM",
+      "paths": [
+        "apps/par-dashboard/package.json",
+        "apps/par-dashboard/index.html",
+        "apps/par-dashboard/{eslint,vite}.config.*",
+        "apps/par-dashboard/tsconfig*.json"
+      ],
+      "why": "If dashboard build configuration breaks unnoticed, the reference application can stop linting, testing, or building."
+    },
+    {
+      "id": "workspace-dependencies",
+      "tier": "MEDIUM",
+      "paths": ["package.json", "package-lock.json"],
+      "why": "If workspace dependency configuration breaks unnoticed, package and dashboard validation can fail together."
+    },
+    {
+      "id": "operational-guidance",
+      "tier": "MEDIUM",
+      "paths": ["docs/adr/**", "docs/runbooks/**", "docs/setup/**"],
+      "why": "If operating or installation guidance is wrong, adopters can weaken the trust boundary or misconfigure notifications."
+    },
+    {
+      "id": "repository-process",
+      "tier": "MEDIUM",
+      "paths": [".github/**", "AGENTS.md"],
+      "why": "If repository process instructions break unnoticed, contributors or automation can follow the wrong review procedure."
+    }
+  ]
+}

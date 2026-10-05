@@ -1,9 +1,7 @@
-import type {
-  ReviewerType,
-  RiskTier,
-} from '@scope/pr-attention-router';
+import type { Tier } from '@scope/pr-attention-router/route.ts';
 
-export type { ReviewerType, RiskTier };
+export type RiskTier = Tier;
+export type ReviewerType = 'NON_LEAD_DEVELOPER' | 'TECH_LEAD_OR_SME';
 
 export interface RiskDimension {
   readonly level: 'Low' | 'Moderate' | 'High';
@@ -39,14 +37,14 @@ export const tierDefinitions: readonly TierDefinition[] = [
   {
     tier: 'LOW',
     label: 'Focused change',
-    reviewer: 'Non-lead developer',
+    reviewer: 'Developer familiar with the affected area',
     guidance:
       'Human review is required in V1; candidate for future agent-only approval.',
   },
   {
     tier: 'MEDIUM',
     label: 'Shared surface',
-    reviewer: 'Non-lead developer',
+    reviewer: 'Developer familiar with the affected area',
     guidance: 'Standard developer review is required.',
   },
   {

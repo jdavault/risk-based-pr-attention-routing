@@ -97,8 +97,14 @@ jobs:
           node --input-type=module -e
           "try { import.meta.resolve('react'); process.exit(1); } catch {}"
 
-      - name: Check router package, policy, and workflow contract
-        run: npm run check:router
+      - name: Type-check router package
+        run: npm run typecheck --workspace @scope/pr-attention-router
+
+      - name: Test router package
+        run: npm test --workspace @scope/pr-attention-router
+
+      - name: Check host config
+        run: npm run check:attention-config
 
   dashboard:
     name: Validate dashboard

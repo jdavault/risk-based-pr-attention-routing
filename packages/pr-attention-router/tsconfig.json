@@ -24,8 +24,6 @@
     "erasableSyntaxOnly": true
   },
   "include": [
-    "lib",
-    "cli",
-    "test"
+    "*.ts"
   ]
 }

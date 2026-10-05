@@ -36,83 +36,22 @@ deterministic floor.
 
 ## Attention Tiers
 
-### Low: Lightweight Human Review
-
-Examples:
-
-- Localized dashboard component copy, markup, style, or accessibility changes,
-  such as `TierCard.tsx` and its CSS module
-- Reference or explanatory documentation outside operational runbooks, ADRs,
-  and installation guidance
-- Isolated dashboard changes that do not alter the shared app shell, sample
-  data, domain contracts, package configuration, or routing behavior
-
-**Reviewer:** A developer familiar with the affected area.
-
-### Medium: Targeted Human Review
-
-Examples:
-
-- The dashboard app shell, entry point, shared domain types, sample data, or
-  global styles
-- Root or dashboard dependency, TypeScript, Vite, and ESLint configuration
-- Operational runbooks, ADRs, and installation guidance
-- The pull-request template or other non-workflow GitHub configuration
-- Repository agent instructions
-- Failed or missing validation, missing or conflicting material context, a
-  deleted test, five or more production files, or 250 or more changed lines
-
-**Blast radius:** Multiple consumers, workflows, or features could be
-affected.
-
-**Review focus:** Identify the specific areas that require reviewer attention.
-
-**Reviewer:** A non-lead developer.
-
-### High: Tech Lead or SME Review
-
-Examples:
-
-- Any file under `.github/workflows/`, because a mistake could bypass
-  validation, weaken the trust boundary, expose credentials, or misclassify a
-  pull request
-- Any file in `packages/pr-attention-router/`, because a mistake could affect
-  every classification, floor-enforcement decision, persistent comment, or
-  notification
-- Any file in `config/pr-attention-router/`, because a mistake could assign the
-  wrong deterministic floor or provide incorrect host context to Codex
-
-**Blast radius:** Every pull request classified by this POC could be affected.
-
-**Reviewer:** A Tech Lead or relevant subject-matter expert.
-
-This repository has no sitemap, production SEO surface, authentication,
-payment flow, database, or migration path. Those concerns are not V1 rules
-here; an adopting repository adds them to its own host policy only when the
-corresponding paths actually exist.
+The repository-owned
+[rubric](config/pr-attention-router/rubric.md) is the single source for LOW,
+MEDIUM, and HIGH definitions, examples, blast radius, and review focus. The
+router derives reviewer authority from the final tier: HIGH requires a Tech
+Lead or relevant SME; LOW and MEDIUM require a developer familiar with the
+affected area.
 
 ## Signals and Context
 
-The deterministic floor uses available repository signals:
-
-- Changed paths, rename origins, and change size
-- Module and consumer blast radius
-- Tests, coverage, and validation results
-- Dependencies, contracts, and configuration
-- Security-sensitive workflow and automation paths
-
-The router also uses available Jira, specification, ADR, and pull-request
-context to understand intent and business meaning. Pull requests declare that
-state with a structured body field:
-
-```text
-Material context: SUFFICIENT
-```
-
-Use `CONFLICTING` when the supplied context disagrees with the change. An
-absent field is treated as `MISSING`. Missing Jira context alone does not
-prevent LOW when the pull request otherwise supplies enough evidence, but
-missing or conflicting material context establishes at least a MEDIUM floor.
+Code guarantees only three deterministic floors: host path rules, failed
+required validation (MEDIUM), and 250 or more changed lines (MEDIUM).
+`rules.json` answers “where did the change occur?”; `rubric.md` answers “what
+does the change actually do?” Codex applies the repository rubric using
+probability, impact, detectability, and blast radius. It may raise the coded
+floor but cannot lower it. Missing or contradictory context and deleted or
+weakened tests are evidence Codex weighs rather than separate coded rules.
 
 ## GitHub Actions Flow
 
@@ -124,26 +63,22 @@ Validate repository
   lint + type-check + test + build + whitespace
              |
              v
-Collect deterministic evidence and floor
+Classify: collect evidence and floor
              |
              v
 openai/codex-action (read-only)
              |
              v
-Enforce deterministic floor
+Final tier = max(floor, Codex)
              |
              v
 LOW / MEDIUM / HIGH
-  + rationale
-  + blast radius
-  + review focus
+  + reasons and review focus
   + recommended reviewer
-  + missing evidence
              |
              v
 Persistent PR comment
-  + optional change-only email
-  + optional change-only Slack message
+  + change-only email and Slack messages
              |
              v
 Human review and decision
@@ -155,11 +90,13 @@ The workflows and workspaces stay separate:
   `packages/pr-attention-router` without installing React, and validates the
   `apps/par-dashboard` client in a separate job.
 - `PR Attention Review` runs after validation succeeds, fails, or times out.
-  It loads trusted code from the package, loads host rules from
-  `config/pr-attention-router`, requests structured read-only Codex judgment,
-  enforces the floor, and updates one persistent PR comment.
-- `apps/par-dashboard` imports only the package's public types and comment
-  renderer. It contains no routing, policy, GitHub, email, or Slack logic.
+  Its read-only classify job loads trusted code and host rules, inspects the PR
+  in a separate checkout, and requests structured Codex judgment. Its publish
+  job sees no PR source, updates one persistent comment, and may send email and
+  Slack alerts.
+- `apps/par-dashboard` is an optional client of the package's public
+  `RouteResult` contract. It owns only its synthetic display model and contains
+  no host policy, GitHub, email, or Slack logic.
 
 The POC runs on GitHub-hosted `ubuntu-24.04` runners with Node 24. Codex uses
 the action's built-in `read-only` safety strategy. A retired local-runner
@@ -168,17 +105,20 @@ runbook remains only as diagnostic history.
 ## Notifications
 
 The persistent PR comment is the classification source of truth. Email and
-Slack notifications are optional and change-only: they send for the first
-classification or when the tier changes, not for same-tier updates. Delivery
-failures do not block publication of the PR comment.
+Slack are change-only: they send for the first classification or when the tier
+changes, not for same-tier updates. Delivery failure does not block the
+comment.
 
-- Email uses repository-configured SMTP settings. LOW and MEDIUM route to
-  `PAR_EMAIL_TO_TEAM`; HIGH routes to `PAR_EMAIL_TO_LEAD`.
+- Plain unauthenticated SMTP uses Python's standard-library `smtplib` in the
+  trusted publish job, keeping the router package dependency-free. HIGH routes
+  to `PAR_EMAIL_TO_LEAD`; LOW/MEDIUM routes to `PAR_EMAIL_TO_TEAM`.
 - Slack uses `SLACK_BOT_TOKEN`, `PAR_SLACK_CHANNEL_ID`, and the Web API
   `chat.postMessage` method.
-- `PAR_EMAIL_ENABLED` and `PAR_SLACK_ENABLED` independently gate delivery.
-- Both channels receive only tier/title, reviewer and floor, and the PR URL;
-  detailed reasoning remains in the persistent comment.
+- Both receive only tier/title, reviewer and floor, and the PR URL; detailed
+  reasoning remains in the persistent comment.
+- If email later needs authentication, TLS policy, templates, attachments,
+  retries, or shared application behavior, use an approved Node adapter such
+  as Nodemailer.
 
 Notifications do not grant approval, merge, deployment, release, or source
 modification authority.
@@ -227,6 +167,7 @@ npm run check
 ## Documentation
 
 - [ADR-0001: Route attention before automating pull request decisions](docs/adr/ADR-0001-route-attention-before-automation.md)
+- [ADR-0002: Keep the router lean and host-defined](docs/adr/ADR-0002-keep-the-router-lean-and-host-defined.md)
 - [Local GitHub Actions runner runbook](docs/runbooks/local-actions-runner.md)
 - [PR attention notification runbook](docs/runbooks/pr-attention-notification.md)
 - [Personal Mac POC build prompt](docs/personal-mac-poc-build-prompt.md)

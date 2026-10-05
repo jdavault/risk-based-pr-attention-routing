@@ -17,6 +17,9 @@ describe('App', () => {
       screen.getByText('Proof of concept • Classification only.'),
     ).toBeVisible();
     expect(screen.getByText('Human authority preserved')).toBeVisible();
+    expect(
+      screen.getAllByText('Developer familiar with the affected area').length,
+    ).toBeGreaterThan(0);
   });
 
   it('filters the review queue by attention tier', async () => {
@@ -69,10 +72,12 @@ describe('App', () => {
       screen.getByText('Persistent PR comment preview'),
     );
 
-    const preview = screen.getByText(/## PR Attention Review — HIGH/u);
+    const preview = screen.getByText(/## PR Attention Review: HIGH/u);
     expect(preview).toHaveTextContent(
       '**Reviewer:** Tech Lead or relevant SME',
     );
+    expect(preview).toHaveTextContent('**Deterministic floor:** HIGH');
+    expect(preview).toHaveTextContent('### Reasons');
     expect(preview).not.toHaveTextContent('[object Object]');
   });
 });

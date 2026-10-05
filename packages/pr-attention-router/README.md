@@ -1,13 +1,21 @@
-# PR Attention Router
+# @scope/pr-attention-router
 
-Host-neutral, classification-only PR attention routing for GitHub Actions.
-The package computes and enforces a deterministic LOW, MEDIUM, or HIGH floor,
-renders the persistent review comment, and optionally sends change-only email
-and Slack notifications.
+Classification-only PR attention router. Code guarantees floors for sensitive files, failing
+CI, and big changes; the host repository's rubric defines LOW, MEDIUM, and HIGH; the AI applies
+that rubric and may raise the floor but never lower it.
 
-The package never approves, merges, deploys, releases, or modifies pull-request
-source. Each adopting repository owns its path policy, conformance cases, host
-context, workflow trigger, recipients, and credentials outside this package.
+This package is identical in every repository and contains no host paths.
 
-The TypeScript entry points run directly on Node.js 22.18 or newer. The package
-contains no React, Vite, DOM, or repository-specific policy.
+| File | Role |
+| --- | --- |
+| `route.ts` | Floor, final tier, reviewer, comment, Slack text, prompt assembly, and the CLI |
+| `route.test.ts` | Generic tests with an in-memory fixture |
+| `classification-prompt.md` | Generic process and the four risk dimensions |
+| `classification.schema.json` | Codex output: tier, summary, reasons, reviewFocus |
+
+A host supplies `rules.json` and `rubric.md` in one directory and validates them with:
+
+    node packages/pr-attention-router/route.ts check <adapter-dir> <repo-root>
+
+Tested on Node 24 (TypeScript runs natively; `engines` allows 22.18+, which is untested). No
+runtime dependencies.

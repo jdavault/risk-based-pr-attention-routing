@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PR attention classification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tier", "summary", "reasons", "reviewFocus"],
+  "properties": {
+    "tier": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "reasons": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "reviewFocus": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    }
+  }
+}
