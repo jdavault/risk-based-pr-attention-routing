@@ -63,13 +63,13 @@ Validate repository
   lint + type-check + test + build + whitespace
              |
              v
-Classify: collect evidence and floor
+Collect trusted evidence and floor
              |
              v
-openai/codex-action (read-only)
+Classify with Codex (read-only)
              |
              v
-Final tier = max(floor, Codex)
+Finalize: tier = max(floor, Codex)
              |
              v
 LOW / MEDIUM / HIGH
@@ -77,8 +77,12 @@ LOW / MEDIUM / HIGH
   + recommended reviewer
              |
              v
-Persistent PR comment
-  + change-only email and Slack messages
+Notify on first result or tier change
+  + email
+  + Slack
+             |
+             v
+Publish persistent PR comment
              |
              v
 Human review and decision
@@ -90,10 +94,10 @@ The workflows and workspaces stay separate:
   `packages/pr-attention-router` without installing React, and validates the
   `apps/par-dashboard` client in a separate job.
 - `PR Attention Review` runs after validation succeeds, fails, or times out.
-  Its read-only classify job loads trusted code and host rules, inspects the PR
-  in a separate checkout, and requests structured Codex judgment. Its publish
-  job sees no PR source, updates one persistent comment, and may send email and
-  Slack alerts.
+  Explicit evidence, classification, finalization, notification, and
+  publication jobs make the trust boundary and each delivery outcome visible.
+  The read-only jobs load trusted code and host rules while inspecting the PR
+  in a separate checkout. Notification and publication jobs see no PR source.
 - `apps/par-dashboard` is an optional client of the package's public
   `RouteResult` contract. It owns only its synthetic display model and contains
   no host policy, GitHub, email, or Slack logic.
@@ -110,7 +114,7 @@ changes, not for same-tier updates. Delivery failure does not block the
 comment.
 
 - Plain unauthenticated SMTP uses Python's standard-library `smtplib` in the
-  trusted publish job, keeping the router package dependency-free. HIGH routes
+  trusted email notification job, keeping the router package dependency-free. HIGH routes
   to `PAR_EMAIL_TO_LEAD`; LOW/MEDIUM routes to `PAR_EMAIL_TO_TEAM`.
 - Slack uses `SLACK_BOT_TOKEN`, `PAR_SLACK_CHANNEL_ID`, and the Web API
   `chat.postMessage` method.

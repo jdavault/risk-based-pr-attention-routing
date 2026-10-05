@@ -88,23 +88,30 @@ uses `workflow_run`, and always loads itself, the router, and host config from
 the trusted default-branch commit (`github.sha`). It checks the validated PR
 head out separately under `.par/target` for read-only inspection.
 
-The workflow has two jobs:
+The workflow uses explicit jobs so stage and notification outcomes appear in
+the GitHub Actions graph while classification logic remains in `route.ts`:
 
-- `classify`: read-only repository permissions, PR-head inspection, evidence,
-  prompt construction, and optional Codex classification.
-- `publish`: trusted checkout only, one persistent PR comment, and short email
-  and Slack alerts only on first classification or a tier change.
+1. **Collect trusted evidence** authorizes the PR, performs the read-only PR
+   checkout, collects bounded evidence, and summarizes the floor.
+2. **Classify with Codex** builds the prompt and runs Codex read-only with the
+   OpenAI key and no GitHub write permission.
+3. **Finalize attention result** reads the existing marker, computes the final
+   result, and passes one bounded result downstream without PR source or
+   notification credentials.
+4. **Notify email** and **Notify Slack** run in parallel with no repository
+   permissions and only their own credentials. Each failure is independently
+   visible and cannot block publication.
+5. **Publish attention result** runs after both notification jobs regardless of
+   outcome, writes the persistent comment with `issues: write` and
+   `pull-requests: write`, and summarizes
+   every outcome.
 
-Only classify sees the OpenAI key. Only publish can write a comment and see
-notification credentials. Same-repository, human-authored PRs from
-collaborators with write access are accepted. The validated head SHA must
-still equal the current PR head SHA. Fork PRs never reach secrets.
-
-The router package has no notification dependencies. Publish sends the same
-three-line summary through Python's standard-library SMTP client and Slack's
-Web API. HIGH email goes to `PAR_EMAIL_TO_LEAD`; LOW/MEDIUM goes to
-`PAR_EMAIL_TO_TEAM`. Both transports are best-effort, change-only, and unable
-to change classification or prevent the persistent comment.
+Same-repository, human-authored PRs from collaborators with write access are
+accepted. The validated head SHA must still equal the current PR head SHA.
+Fork PRs never reach secrets. The router package has no notification
+dependencies. HIGH email goes to `PAR_EMAIL_TO_LEAD`; LOW/MEDIUM goes to
+`PAR_EMAIL_TO_TEAM`. Both transports are change-only and unable to change
+classification or prevent the persistent comment.
 
 ## Dashboard boundary
 
@@ -132,6 +139,8 @@ is conservatively dotfile-aware; configuration validation remains strict so
 - Keeping notification adapters in the host workflow avoids package
   dependencies but makes their small scripts part of the workflow review
   surface; both remain best-effort and the comment remains canonical.
+- Explicit jobs add checkouts and hand-offs, but make a failed email or Slack
+  alert visible without expanding the router package or its authority.
 - Native TypeScript execution depends on Node 22.18+; CI uses Node 24.
 - Host globs can become stale; `route.ts check` validates every glob against
   tracked files in required CI.

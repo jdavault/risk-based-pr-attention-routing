@@ -42,11 +42,12 @@ run lint, typecheck, tests, and build.
 
 ## Task 4: Workflows and root scripts
 
-Reduce the attention workflow to classify/publish using the four `route.ts`
-subcommands. Keep the trusted/default checkout and untrusted target checkout
-separate, verify current head equals validated head, keep Codex read-only and
-failure-tolerant, and send only change-triggered email and Slack summaries.
-Use Python `smtplib` in publish so the router stays dependency-free. Align
+Run the four `route.ts` subcommands across explicit evidence, classification,
+finalization, notification, and publication jobs. Keep the trusted/default
+checkout and untrusted target checkout separate, verify current head equals
+validated head, keep Codex read-only and failure-tolerant, and send only
+change-triggered email and Slack summaries. Use Python `smtplib` in the email
+notification job so the router stays dependency-free. Align
 `validate.yml` and root scripts with package tests, adapter check, dashboard
 checks, and Node 24. Re-check P3's in-flight `verify` workflow before final
 alignment.
