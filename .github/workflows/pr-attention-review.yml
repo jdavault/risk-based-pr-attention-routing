@@ -1,4 +1,5 @@
 # Classification-only PR attention router. Code sets a floor from path rules,
+# Acceptance probe: workflow-only comments must retain the HIGH floor.
 # failing CI, and change size; Codex applies the repository rubric and may
 # raise it; the higher tier wins. It never approves, merges, deploys, or
 # changes PR source. Its only writes are one PR comment and a short Slack and
