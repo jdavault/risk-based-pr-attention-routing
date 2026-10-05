@@ -5,6 +5,7 @@
 # workflow_run loads this file from the default branch. Every job checks out
 # that trusted commit at github.sha; the PR is separate under .par/target and
 # is inspected read-only. `check:workflow` enforces this contract.
+# Acceptance probe: this comment-only change must classify as HIGH.
 name: PR Attention Review
 
 on:
