@@ -1,0 +1,82 @@
+{
+  "description": "V1 conformance cases: one per HIGH rule, one representative MEDIUM, one LOW, one anchored lookalike, and one per built-in non-path signal.",
+  "cases": [
+    {
+      "name": "Attention workflow is HIGH",
+      "paths": [".github/workflows/pr-attention-review.yml"],
+      "floor": "HIGH",
+      "rules": ["workflow-automation"],
+      "notRules": ["github-configuration"]
+    },
+    {
+      "name": "Router package code is HIGH",
+      "paths": ["packages/pr-attention-router/lib/enforceClassification.ts"],
+      "floor": "HIGH",
+      "rules": ["router-package"]
+    },
+    {
+      "name": "Host policy is HIGH",
+      "paths": ["config/pr-attention-router/policy.json"],
+      "floor": "HIGH",
+      "rules": ["router-host-policy"]
+    },
+    {
+      "name": "Operational runbook is MEDIUM",
+      "paths": ["docs/runbooks/pr-attention-notification.md"],
+      "floor": "MEDIUM",
+      "rules": ["operational-guidance"]
+    },
+    {
+      "name": "Localized TierCard change may stay LOW",
+      "paths": ["apps/attention-router/src/components/TierCard.tsx"],
+      "floor": "LOW"
+    },
+    {
+      "name": "Lookalike workflow path stays LOW",
+      "paths": ["archive/.github/workflows/validate.yml"],
+      "floor": "LOW",
+      "notRules": ["workflow-automation", "github-configuration"]
+    },
+    {
+      "name": "Failed validation is MEDIUM",
+      "paths": ["apps/attention-router/src/components/TierCard.tsx"],
+      "validationStatus": "FAILED",
+      "floor": "MEDIUM"
+    },
+    {
+      "name": "Missing material context is MEDIUM",
+      "paths": ["apps/attention-router/src/components/TierCard.tsx"],
+      "materialContext": "MISSING",
+      "floor": "MEDIUM"
+    },
+    {
+      "name": "Conflicting material context is MEDIUM",
+      "paths": ["apps/attention-router/src/components/TierCard.tsx"],
+      "materialContext": "CONFLICTING",
+      "floor": "MEDIUM"
+    },
+    {
+      "name": "Deleted test is MEDIUM",
+      "paths": ["apps/attention-router/src/__tests__/App.spec.tsx"],
+      "status": "DELETED",
+      "floor": "MEDIUM"
+    },
+    {
+      "name": "Five dashboard leaf files are MEDIUM by breadth",
+      "paths": [
+        "apps/attention-router/src/components/EvidencePanel.module.css",
+        "apps/attention-router/src/components/EvidencePanel.tsx",
+        "apps/attention-router/src/components/ReviewQueue.module.css",
+        "apps/attention-router/src/components/ReviewQueue.tsx",
+        "apps/attention-router/src/components/TierCard.tsx"
+      ],
+      "floor": "MEDIUM"
+    },
+    {
+      "name": "A 250-line TierCard change is MEDIUM",
+      "paths": ["apps/attention-router/src/components/TierCard.tsx"],
+      "changedLines": 250,
+      "floor": "MEDIUM"
+    }
+  ]
+}

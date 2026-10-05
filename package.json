@@ -6,6 +6,6 @@
     "packages/*"
   ],
   "scripts": {
-    "check:router": "npm run check --workspace @scope/pr-attention-router && npm run check:policy --workspace @scope/pr-attention-router -- --policy ../../pr-attention-router/policy.json --cases ../../pr-attention-router/policy-cases.json && npm run check:workflow --workspace @scope/pr-attention-router -- --workflow ../../.github/workflows/pr-attention-review.yml"
+    "check:router": "npm run check --workspace @scope/pr-attention-router && npm run check:policy --workspace @scope/pr-attention-router -- --policy ../../config/pr-attention-router/policy.json --cases ../../config/pr-attention-router/policy-cases.json && npm run check:workflow --workspace @scope/pr-attention-router -- --workflow ../../.github/workflows/pr-attention-review.yml"
   }
 }

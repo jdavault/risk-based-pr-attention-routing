@@ -40,11 +40,12 @@ deterministic floor.
 
 Examples:
 
-- Localized UI, copy, style, or accessibility changes
-- User-facing documentation
-- Developer documentation or runbook updates that do not change operational
-  policy or executable configuration
-- Isolated component changes with no shared contracts or business logic
+- Localized dashboard component copy, markup, style, or accessibility changes,
+  such as `TierCard.tsx` and its CSS module
+- Reference or explanatory documentation outside operational runbooks, ADRs,
+  and installation guidance
+- Isolated dashboard changes that do not alter the shared app shell, sample
+  data, domain contracts, package configuration, or routing behavior
 
 **Reviewer:** A developer familiar with the affected area.
 
@@ -52,14 +53,14 @@ Examples:
 
 Examples:
 
-- Shared components
-- Routing or navigation
-- GraphQL or API consumers
-- Meaningful query changes
-- Changes spanning multiple One SEO features
-- Dependency, migration, or build configuration
-- `.github/workflows` changes limited to CI checks, tests, linting, or other
-  non-deployment automation
+- The dashboard app shell, entry point, shared domain types, sample data, or
+  global styles
+- Root or dashboard dependency, TypeScript, Vite, and ESLint configuration
+- Operational runbooks, ADRs, and installation guidance
+- The pull-request template or other non-workflow GitHub configuration
+- Repository agent instructions
+- Failed or missing validation, missing or conflicting material context, a
+  deleted test, five or more production files, or 250 or more changed lines
 
 **Blast radius:** Multiple consumers, workflows, or features could be
 affected.
@@ -72,22 +73,23 @@ affected.
 
 Examples:
 
-- Sitemap eligibility or indexability
-- Metadata publishing or delivery
-- Authorization or security
-- Shared API or event contracts
-- Persistence, schemas, or migrations
-- Destructive or difficult-to-reverse changes
-- `.github/workflows` changes affecting deployment, release, publishing,
-  permissions, secrets, OIDC, credentials, or other security-sensitive
-  automation
-- Runbook or documentation changes that alter operational, security, or
-  production procedures
+- Any file under `.github/workflows/`, because a mistake could bypass
+  validation, weaken the trust boundary, expose credentials, or misclassify a
+  pull request
+- Any file in `packages/pr-attention-router/`, because a mistake could affect
+  every classification, floor-enforcement decision, persistent comment, or
+  notification
+- Any file in `config/pr-attention-router/`, because a mistake could assign the
+  wrong deterministic floor or provide incorrect host context to Codex
 
-**Blast radius:** Core business behavior, data integrity, production
-operations, security, or many consumers or pages could be affected.
+**Blast radius:** Every pull request classified by this POC could be affected.
 
 **Reviewer:** A Tech Lead or relevant subject-matter expert.
+
+This repository has no sitemap, production SEO surface, authentication,
+payment flow, database, or migration path. Those concerns are not V1 rules
+here; an adopting repository adds them to its own host policy only when the
+corresponding paths actually exist.
 
 ## Signals and Context
 
