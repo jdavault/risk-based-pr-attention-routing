@@ -14,32 +14,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Validate
+  authorize:
+    name: Authorize and check whitespace
     if: vars.PAR_APP_WORKFLOWS_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      allowed: ${{ steps.authorize.outputs.allowed }}
 
     steps:
       - name: Authorize trusted POC event
+        id: authorize
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          TARGET_REPOSITORY: ${{ github.repository }}
         run: |
-          EVENT_NAME='${{ github.event_name }}'
-          EVENT_ACTOR='${{ github.actor }}'
-          PR_AUTHOR='${{ github.event.pull_request.user.login }}'
-          PR_HEAD_REPOSITORY='${{ github.event.pull_request.head.repo.full_name }}'
-          TARGET_REPOSITORY='${{ github.repository }}'
-
-          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$EVENT_ACTOR" == "jdavault" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo 'allowed=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           if [[ "$EVENT_NAME" == "pull_request" && \
-                "$PR_AUTHOR" == "jdavault" && \
+                -n "$PR_AUTHOR" && \
                 "$PR_HEAD_REPOSITORY" == "$TARGET_REPOSITORY" ]]; then
+            echo 'allowed=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "::error::This local POC accepts only jdavault-authored, same-repository pull requests."
+          echo "::error::Only manually dispatched or same-repository pull-request validation is allowed."
           exit 1
 
       - name: Check out repository
@@ -47,14 +53,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-
-      - name: Install dependencies
-        run: npm ci --prefix apps/attention-router
 
       - name: Check whitespace
         env:
@@ -67,14 +65,72 @@ jobs:
             git diff --check HEAD~1 HEAD
           fi
 
+  router:
+    name: Validate router package
+    needs: authorize
+    if: needs.authorize.outputs.allowed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install router dependencies only
+        run: >-
+          npm ci --ignore-scripts
+          --workspace @scope/pr-attention-router
+          --include-workspace-root=false
+
+      - name: Prove React is not installed
+        working-directory: packages/pr-attention-router
+        run: >-
+          node --input-type=module -e
+          "try { import.meta.resolve('react'); process.exit(1); } catch {}"
+
+      - name: Check router package, policy, and workflow contract
+        run: npm run check:router
+
+  dashboard:
+    name: Validate dashboard
+    needs: authorize
+    if: needs.authorize.outputs.allowed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install workspace dependencies
+        run: npm ci --ignore-scripts
+
       - name: Lint
-        run: npm --prefix apps/attention-router run lint
+        run: npm run lint --workspace par-dashboard
 
       - name: Type-check
-        run: npm --prefix apps/attention-router run typecheck
+        run: npm run typecheck --workspace par-dashboard
 
       - name: Test
-        run: npm --prefix apps/attention-router test
+        run: npm test --workspace par-dashboard
 
       - name: Build
-        run: npm --prefix apps/attention-router run build
+        run: npm run build --workspace par-dashboard

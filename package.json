@@ -1,0 +1,13 @@
+{
+  "name": "risk-based-pr-attention-routing",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "npm run check:router && npm run check:dashboard",
+    "check:router": "npm run check --workspace @scope/pr-attention-router && npm run check:policy --workspace @scope/pr-attention-router -- --policy ../../config/pr-attention-router/policy.json --cases ../../config/pr-attention-router/policy-cases.json && npm run check:workflow --workspace @scope/pr-attention-router -- --workflow ../../.github/workflows/pr-attention-review.yml",
+    "check:dashboard": "npm run lint --workspace par-dashboard && npm run typecheck --workspace par-dashboard && npm test --workspace par-dashboard && npm run build --workspace par-dashboard"
+  }
+}

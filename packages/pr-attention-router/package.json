@@ -1,0 +1,34 @@
+{
+  "name": "@scope/pr-attention-router",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Classification-only PR attention routing with host-owned policy.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "exports": {
+    ".": "./lib/index.ts"
+  },
+  "files": [
+    "cli",
+    "lib",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit --pretty false",
+    "test": "node --test test/*.test.ts",
+    "check": "npm run typecheck && npm test",
+    "check:policy": "node cli/checkPolicy.ts",
+    "check:workflow": "node cli/checkWorkflow.ts"
+  },
+  "dependencies": {
+    "nodemailer": "^10.0.14",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/nodemailer": "^7.0.0",
+    "typescript": "~5.9.0"
+  }
+}

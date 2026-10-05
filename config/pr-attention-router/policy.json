@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "description": "Deterministic floor policy for the isolated PR Attention Router POC.",
+  "pathRules": [
+    {
+      "id": "workflow-automation",
+      "tier": "HIGH",
+      "patterns": ["^\\.github/workflows/"],
+      "rationale": "If CI or attention automation breaks unnoticed, unvalidated changes can pass or pull requests can be misclassified."
+    },
+    {
+      "id": "router-package",
+      "tier": "HIGH",
+      "patterns": ["^packages/pr-attention-router/"],
+      "rationale": "If floor enforcement or notification code breaks unnoticed, every classified pull request can receive an unsafe result."
+    },
+    {
+      "id": "router-host-policy",
+      "tier": "HIGH",
+      "patterns": ["^config/pr-attention-router/"],
+      "rationale": "If repository policy or host context breaks unnoticed, every pull request can receive the wrong deterministic floor or AI context."
+    },
+    {
+      "id": "operational-guidance",
+      "tier": "MEDIUM",
+      "patterns": ["^docs/(?:adr|runbooks|setup)/"],
+      "rationale": "If operational guidance breaks unnoticed, adopters or responders can configure or operate the router incorrectly."
+    },
+    {
+      "id": "github-configuration",
+      "tier": "MEDIUM",
+      "patterns": ["^\\.github/(?!workflows/)"],
+      "rationale": "If PR context configuration breaks unnoticed, reviewers can lose the intent evidence needed for a safe LOW result."
+    },
+    {
+      "id": "dashboard-shared-surface",
+      "tier": "MEDIUM",
+      "patterns": [
+        "^apps/par-dashboard/src/(?:(?:App|main)\\.tsx$|(?:domain|data)/|(?:global|App\\.module)\\.css$)"
+      ],
+      "rationale": "If the dashboard shell or shared model breaks unnoticed, every dashboard tier or queue can display incorrect information."
+    },
+    {
+      "id": "build-and-dependencies",
+      "tier": "MEDIUM",
+      "patterns": [
+        "^package(?:-lock)?\\.json$",
+        "^apps/par-dashboard/(?:package\\.json|tsconfig(?:\\.[^.]+)?\\.json|vite\\.config\\.ts|eslint\\.config\\.js)$"
+      ],
+      "rationale": "If build or dependency configuration breaks unnoticed, validation or the production dashboard can diverge for all consumers."
+    },
+    {
+      "id": "agent-instructions",
+      "tier": "MEDIUM",
+      "patterns": ["^AGENTS\\.md$"],
+      "rationale": "If repository instructions break unnoticed, every coding agent can operate under the wrong safety or workflow contract."
+    }
+  ],
+  "productionFilePattern": "\\.(?:[cm]?[jt]sx?|css|html)$",
+  "nonProductionFilePattern": "(^|/)(?:__tests__|tests?|docs|packages/pr-attention-router)/|\\.(?:spec|test)\\.[cm]?[jt]sx?$|\\.config\\.[cm]?[jt]s$",
+  "testFilePattern": "(^|/)(?:__tests__|tests?)/|\\.(?:spec|test)\\.[cm]?[jt]sx?$",
+  "productionFileThreshold": 5,
+  "changedLineThreshold": 250
+}

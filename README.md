@@ -40,11 +40,12 @@ deterministic floor.
 
 Examples:
 
-- Localized UI, copy, style, or accessibility changes
-- User-facing documentation
-- Developer documentation or runbook updates that do not change operational
-  policy or executable configuration
-- Isolated component changes with no shared contracts or business logic
+- Localized dashboard component copy, markup, style, or accessibility changes,
+  such as `TierCard.tsx` and its CSS module
+- Reference or explanatory documentation outside operational runbooks, ADRs,
+  and installation guidance
+- Isolated dashboard changes that do not alter the shared app shell, sample
+  data, domain contracts, package configuration, or routing behavior
 
 **Reviewer:** A developer familiar with the affected area.
 
@@ -52,14 +53,14 @@ Examples:
 
 Examples:
 
-- Shared components
-- Routing or navigation
-- GraphQL or API consumers
-- Meaningful query changes
-- Changes spanning multiple One SEO features
-- Dependency, migration, or build configuration
-- `.github/workflows` changes limited to CI checks, tests, linting, or other
-  non-deployment automation
+- The dashboard app shell, entry point, shared domain types, sample data, or
+  global styles
+- Root or dashboard dependency, TypeScript, Vite, and ESLint configuration
+- Operational runbooks, ADRs, and installation guidance
+- The pull-request template or other non-workflow GitHub configuration
+- Repository agent instructions
+- Failed or missing validation, missing or conflicting material context, a
+  deleted test, five or more production files, or 250 or more changed lines
 
 **Blast radius:** Multiple consumers, workflows, or features could be
 affected.
@@ -72,22 +73,23 @@ affected.
 
 Examples:
 
-- Sitemap eligibility or indexability
-- Metadata publishing or delivery
-- Authorization or security
-- Shared API or event contracts
-- Persistence, schemas, or migrations
-- Destructive or difficult-to-reverse changes
-- `.github/workflows` changes affecting deployment, release, publishing,
-  permissions, secrets, OIDC, credentials, or other security-sensitive
-  automation
-- Runbook or documentation changes that alter operational, security, or
-  production procedures
+- Any file under `.github/workflows/`, because a mistake could bypass
+  validation, weaken the trust boundary, expose credentials, or misclassify a
+  pull request
+- Any file in `packages/pr-attention-router/`, because a mistake could affect
+  every classification, floor-enforcement decision, persistent comment, or
+  notification
+- Any file in `config/pr-attention-router/`, because a mistake could assign the
+  wrong deterministic floor or provide incorrect host context to Codex
 
-**Blast radius:** Core business behavior, data integrity, production
-operations, security, or many consumers or pages could be affected.
+**Blast radius:** Every pull request classified by this POC could be affected.
 
 **Reviewer:** A Tech Lead or relevant subject-matter expert.
+
+This repository has no sitemap, production SEO surface, authentication,
+payment flow, database, or migration path. Those concerns are not V1 rules
+here; an adopting repository adds them to its own host policy only when the
+corresponding paths actually exist.
 
 ## Signals and Context
 
@@ -147,21 +149,21 @@ Persistent PR comment
 Human review and decision
 ```
 
-The workflows run separately:
+The workflows and workspaces stay separate:
 
-- `Validate repository` runs linting, type-checking, tests, a production build,
-  and whitespace validation.
-- `PR Attention Review` runs after validation succeeds or fails, so failed
-  validation can raise the deterministic floor. It collects evidence, requests
-  structured read-only Codex judgment, enforces the floor, and updates one
-  persistent PR comment.
-- `Local runner smoke test` verifies the self-hosted runner independently of
-  the application.
+- `Validate repository` checks whitespace once, validates
+  `packages/pr-attention-router` without installing React, and validates the
+  `apps/par-dashboard` client in a separate job.
+- `PR Attention Review` runs after validation succeeds, fails, or times out.
+  It loads trusted code from the package, loads host rules from
+  `config/pr-attention-router`, requests structured read-only Codex judgment,
+  enforces the floor, and updates one persistent PR comment.
+- `apps/par-dashboard` imports only the package's public types and comment
+  renderer. It contains no routing, policy, GitHub, email, or Slack logic.
 
-The personal POC runs on a self-hosted macOS ARM64 runner. Codex uses the
-action’s built-in `read-only` safety strategy. The eventual work-repository
-integration must use its approved enterprise runner and credential controls
-rather than copying local-runner lifecycle choices.
+The POC runs on GitHub-hosted `ubuntu-24.04` runners with Node 24. Codex uses
+the action's built-in `read-only` safety strategy. A retired local-runner
+runbook remains only as diagnostic history.
 
 ## Notifications
 
@@ -175,6 +177,8 @@ failures do not block publication of the PR comment.
 - Slack uses `SLACK_BOT_TOKEN`, `PAR_SLACK_CHANNEL_ID`, and the Web API
   `chat.postMessage` method.
 - `PAR_EMAIL_ENABLED` and `PAR_SLACK_ENABLED` independently gate delivery.
+- Both channels receive only tier/title, reviewer and floor, and the PR URL;
+  detailed reasoning remains in the persistent comment.
 
 Notifications do not grant approval, merge, deployment, release, or source
 modification authority.
@@ -210,18 +214,14 @@ The standalone React and TypeScript app provides controlled LOW, MEDIUM, and
 HIGH examples for local testing.
 
 ```bash
-cd apps/attention-router
-npm ci
-npm run dev -- --port 5157
+npm ci --ignore-scripts
+npm run dev --workspace par-dashboard -- --port 5157
 ```
 
 Then open <http://localhost:5157>. Useful checks are:
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
+npm run check
 ```
 
 ## Documentation
@@ -233,4 +233,4 @@ npm run build
 
 ## Attention Router Dashboard
 
-![PR Attention Router dashboard showing LOW, MEDIUM, and HIGH review tiers](apps/attention-router/public/assets/pr-attention-router-dashboard.png)
+![PR Attention Router dashboard showing LOW, MEDIUM, and HIGH review tiers](apps/par-dashboard/public/assets/pr-attention-router-dashboard.png)

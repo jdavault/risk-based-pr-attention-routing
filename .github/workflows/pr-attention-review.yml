@@ -1,3 +1,10 @@
+# Classification-only PR attention router. It never approves, merges,
+# deploys, releases, or changes PR source; its only repository write is the
+# persistent classification comment.
+#
+# workflow_run loads this file from the default branch. Every job checks out
+# that trusted commit at github.sha; the PR is separate under .par/target and
+# is inspected read-only. `check:workflow` enforces this contract.
 name: PR Attention Review
 
 on:
@@ -8,6 +15,10 @@ on:
 permissions:
   contents: read
 
+env:
+  PAR_ROUTER: packages/pr-attention-router
+  PAR_ADAPTER: config/pr-attention-router
+
 concurrency:
   group: attention-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
   cancel-in-progress: true
@@ -15,13 +26,14 @@ concurrency:
 jobs:
   evidence:
     name: Collect trusted evidence
+    # Same-repository PRs only. Fork PRs never reach a job that holds secrets.
     if: >
       vars.PAR_APP_WORKFLOWS_ENABLED == 'true' &&
       (github.event.workflow_run.conclusion == 'success' ||
-        github.event.workflow_run.conclusion == 'failure') &&
+        github.event.workflow_run.conclusion == 'failure' ||
+        github.event.workflow_run.conclusion == 'timed_out') &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.actor.login == 'jdavault' &&
       github.event.workflow_run.pull_requests[0].number != null
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -33,10 +45,10 @@ jobs:
       pr-context-json: ${{ steps.pr-context.outputs.context }}
 
     steps:
-      - name: Check out trusted router from main
+      - name: Check out trusted router from the default branch
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -51,10 +63,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
-
-      - name: Install trusted router dependencies
-        run: npm ci --prefix apps/attention-router
+          node-version: '24'
 
       - name: Read and authorize pull request context
         id: pr-context
@@ -66,17 +75,33 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const { readPrMaterialContext } = require(
-              './.github/scripts/read-pr-material-context.js',
+              `${process.cwd()}/${process.env.PAR_ROUTER}/lib/readPrMaterialContext.cjs`,
             );
             const number = Number(process.env.PAR_PR_NUMBER);
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
             const { data: pullRequest } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: number,
             });
 
-            if (pullRequest.user.login !== 'jdavault') {
-              throw new Error('The POC accepts only jdavault-authored pull requests.');
+            if (pullRequest.head.repo?.full_name !== repository) {
+              throw new Error('Only same-repository pull requests are classified.');
+            }
+
+            if (pullRequest.user.type !== 'User') {
+              throw new Error('Only human-authored pull requests are classified.');
+            }
+
+            const { data: authorPermission } =
+              await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: pullRequest.user.login,
+              });
+
+            if (!['admin', 'maintain', 'write'].includes(authorPermission.role_name)) {
+              throw new Error('The pull request author lacks write access to this repository.');
             }
 
             if (pullRequest.head.sha !== process.env.EXPECTED_HEAD_SHA) {
@@ -89,7 +114,7 @@ jobs:
             )?.[0] ?? '';
 
             const prContext = {
-              repository: `${context.repo.owner}/${context.repo.repo}`,
+              repository,
               number,
               title: pullRequest.title,
               url: pullRequest.html_url,
@@ -116,8 +141,8 @@ jobs:
             jira_arguments=(--jira-reference "$JIRA_REFERENCE")
           fi
 
-          ./apps/attention-router/node_modules/.bin/tsx \
-            apps/attention-router/scripts/collectPullRequestEvidence.ts \
+          node "$PAR_ROUTER/cli/collectPullRequestEvidence.ts" \
+            --policy "$PAR_ADAPTER/policy.json" \
             --repository-directory .par/target \
             --base "$BASE_SHA" \
             --head "$HEAD_SHA" \
@@ -136,8 +161,14 @@ jobs:
             const evidence = fs.readFileSync('.par/evidence.json', 'utf8');
 
             if (Buffer.byteLength(evidence, 'utf8') > 400_000) {
-              throw new Error('Deterministic evidence exceeds the POC job-output limit.');
+              throw new Error('Deterministic evidence exceeds the job-output limit.');
             }
+
+            const { assessment } = JSON.parse(evidence);
+            await core.summary
+              .addHeading('PR Attention deterministic floor', 2)
+              .addRaw(`Floor: ${assessment.floor}`, true)
+              .write();
 
             core.setOutput('json', evidence);
 
@@ -152,10 +183,10 @@ jobs:
       ai-classification: ${{ steps.codex.outputs.final-message }}
 
     steps:
-      - name: Check out trusted router from main
+      - name: Check out trusted router from the default branch
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -167,17 +198,26 @@ jobs:
           persist-credentials: false
           path: .par/target
 
-      - name: Provide trusted evidence to Codex
+      - name: Provide trusted evidence and prompt to Codex
         uses: actions/github-script@v8
         env:
           DETERMINISTIC_JSON: ${{ needs.evidence.outputs.deterministic-json }}
         with:
           script: |
             const fs = require('node:fs');
+            const { PAR_ROUTER, PAR_ADAPTER } = process.env;
             fs.mkdirSync('.par/target', { recursive: true });
             fs.writeFileSync(
               '.par/target/evidence.json',
               process.env.DETERMINISTIC_JSON,
+              'utf8',
+            );
+            fs.writeFileSync(
+              '.par/classification-prompt.md',
+              [
+                fs.readFileSync(`${PAR_ROUTER}/lib/classification-prompt.md`, 'utf8'),
+                fs.readFileSync(`${PAR_ADAPTER}/host-context.md`, 'utf8'),
+              ].join('\n'),
               'utf8',
             );
 
@@ -188,8 +228,8 @@ jobs:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           safety-strategy: read-only
           working-directory: .par/target
-          prompt-file: ${{ github.workspace }}/.github/attention-router/classification-prompt.md
-          output-schema-file: ${{ github.workspace }}/.github/attention-router/classification.schema.json
+          prompt-file: ${{ github.workspace }}/.par/classification-prompt.md
+          output-schema-file: ${{ github.workspace }}/${{ env.PAR_ROUTER }}/lib/classification.schema.json
 
   finalize:
     name: Finalize attention result
@@ -206,20 +246,17 @@ jobs:
       classification-json: ${{ steps.inspect-comment.outputs.classification-json }}
 
     steps:
-      - name: Check out trusted router from main
+      - name: Check out trusted router from the default branch
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
-
-      - name: Install trusted router dependencies
-        run: npm ci --prefix apps/attention-router
+          node-version: '24'
 
       - name: Enforce deterministic floor
         env:
@@ -227,8 +264,7 @@ jobs:
           AI_CLASSIFICATION_JSON: ${{ needs.classify.outputs.ai-classification }}
         run: |
           mkdir -p .par
-          ./apps/attention-router/node_modules/.bin/tsx \
-            apps/attention-router/scripts/normalizeClassification.ts \
+          node "$PAR_ROUTER/cli/normalizeClassification.ts" \
             --deterministic-json "$DETERMINISTIC_JSON" \
             --ai-json "$AI_CLASSIFICATION_JSON" \
             --output .par/final-classification.json
@@ -242,7 +278,9 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
-            const inspect = require('./.github/scripts/publish-attention.comment.js');
+            const inspect = require(
+              `${process.cwd()}/${process.env.PAR_ROUTER}/lib/publishAttentionComment.cjs`,
+            );
             await inspect({ github, context, core });
 
   email:
@@ -257,20 +295,24 @@ jobs:
       contents: read
 
     steps:
-      - name: Check out trusted router from main
+      - name: Check out trusted router from the default branch
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
 
-      - name: Install trusted router dependencies
-        run: npm ci --prefix apps/attention-router
+      # Root lockfile, router workspace only: installs nodemailer and yaml.
+      - name: Install the email adapter's runtime dependency
+        run: >-
+          npm ci --omit=dev --ignore-scripts
+          --workspace @scope/pr-attention-router
+          --include-workspace-root=false
 
       - name: Send attention email
         env:
@@ -282,8 +324,7 @@ jobs:
           PAR_EMAIL_TO_TEAM: ${{ vars.PAR_EMAIL_TO_TEAM }}
           PAR_EMAIL_TO_LEAD: ${{ vars.PAR_EMAIL_TO_LEAD }}
         run: |
-          ./apps/attention-router/node_modules/.bin/tsx \
-            apps/attention-router/scripts/sendAttentionEmail.ts \
+          node "$PAR_ROUTER/cli/sendAttentionEmail.ts" \
             --classification-json "$CLASSIFICATION_JSON" \
             --pr-context-json "$PR_CONTEXT_JSON"
 
@@ -299,20 +340,17 @@ jobs:
       contents: read
 
     steps:
-      - name: Check out trusted router from main
+      - name: Check out trusted router from the default branch
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '22'
-
-      - name: Install trusted router dependencies
-        run: npm ci --prefix apps/attention-router
+          node-version: '24'
 
       - name: Send Slack attention message
         env:
@@ -321,8 +359,7 @@ jobs:
           PAR_SLACK_CHANNEL_ID: ${{ vars.PAR_SLACK_CHANNEL_ID }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
-          ./apps/attention-router/node_modules/.bin/tsx \
-            apps/attention-router/scripts/sendAttentionSlack.ts \
+          node "$PAR_ROUTER/cli/sendAttentionSlack.ts" \
             --classification-json "$CLASSIFICATION_JSON" \
             --pr-context-json "$PR_CONTEXT_JSON"
 
@@ -352,10 +389,10 @@ jobs:
             echo "- Slack: $SLACK_RESULT"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Check out trusted router from main
+      - name: Check out trusted router from the default branch
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -380,5 +417,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
-            const publish = require('./.github/scripts/publish-attention.comment.js');
+            const publish = require(
+              `${process.cwd()}/${process.env.PAR_ROUTER}/lib/publishAttentionComment.cjs`,
+            );
             await publish({ github, context, core });

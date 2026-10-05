@@ -147,9 +147,11 @@ checks.
 
 - LOW and MEDIUM route to `PAR_EMAIL_TO_TEAM`.
 - HIGH routes to `PAR_EMAIL_TO_LEAD`.
-- Subjects use `PR Attention <repository> PR #number - <tier>`.
-- Bodies include the rationale, deterministic floor, blast radius, requested
-  reviewer, review focus, missing evidence, and pull-request URL.
+- Email subjects use the first summary line: `[TIER] PR #number: title`.
+- Email and Slack contain only three lines: tier/title, reviewer and
+  deterministic floor, and pull-request URL.
+- Rationale, blast radius, review focus, and missing evidence remain only in
+  the persistent pull-request comment.
 
 ## Change-only behavior
 

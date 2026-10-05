@@ -1,5 +1,29 @@
 # Session Log
 
+## 2026-10-04 — Application-independent router extraction
+
+- Branch: `refactor/extract-pr-attention-router`; PR #11.
+- Extracted reusable routing into `packages/pr-attention-router` with no
+  React, Vite, DOM, or host-path knowledge.
+- Moved repository policy, conformance cases, and Codex context to
+  `config/pr-attention-router`.
+- Renamed the optional UI client to `apps/par-dashboard`; it imports only
+  public package types and the comment renderer.
+- Aligned the attention workflow with P3's stronger trust model: immutable
+  trusted checkout, separate read-only PR checkout, Node 24 native TypeScript,
+  package-owned helpers/prompt/schema, and dependency installation only in the
+  email job.
+- Split hosted validation into authorization/whitespace, isolated router, and
+  dashboard jobs.
+- V1 policy remains 3 HIGH rules, 5 MEDIUM rules, and 12 conformance cases;
+  no target exception is required.
+- Local verification: 64 package tests, 12/12 policy cases, workflow contract,
+  dashboard lint/typecheck/4 tests/build, YAML parse, and `git diff --check`.
+- `PAR_APP_WORKFLOWS_ENABLED` was enabled for PR #11; email and Slack remain
+  disabled for the first hosted validation.
+- The rewritten `workflow_run` orchestration must be acceptance-tested after
+  merge because GitHub loads it from the default branch.
+
 ## 2026-10-04 — Hosted PR Attention Router POC
 
 ### What was built
@@ -8,8 +32,8 @@
   `LOW`, `MEDIUM`, and `HIGH` classification, Codex judgment, deterministic
   floor enforcement, a persistent PR comment, SMTP email, and Slack bot
   notifications.
-- Moved application workflows to GitHub-hosted `ubuntu-24.04` runners while
-  retaining the local runner smoke test.
+- Moved application workflows to GitHub-hosted `ubuntu-24.04` runners. The
+  then-retained local smoke workflow was removed during package extraction.
 - Added deterministic `MEDIUM` handling for operational runbooks and ensured
   failed validation still produces a classification.
 - Added structured PR material context:
@@ -54,9 +78,9 @@
   checked out separately under `.par/target` for read-only inspection.
 - The Vite dashboard is a reference UI and test harness, not a dependency of an
   adopting frontend or backend application.
-- The current POC colocates router runtime and UI under
-  `apps/attention-router`; the intended future boundary is
-  `packages/pr-attention-router` with repository-specific policy configuration.
+- At that checkpoint the POC colocated router runtime and UI under the former
+  `apps/attention-router`; PR #11 later implemented the intended
+  `packages/pr-attention-router` and `config/pr-attention-router` boundary.
 - Existing application validation should be reused where possible. Disabling
   the router must not disable an adopting repository's normal required checks.
 - Slack uses a bot token, not an incoming webhook. Email currently uses plain,
@@ -69,8 +93,8 @@
   warning.
 - npm reports the installed ESLint `9.39.5` as deprecated/unsupported in the
   current environment; application checks still pass.
-- The router runtime is not yet extracted from the Vite package, so a current
-  copy-in installation carries unnecessary React/Vite dependencies.
+- Resolved in PR #11: the router package is independently installable and the
+  renamed `apps/par-dashboard` is an optional client.
 - The workflow contains personal-sandbox `jdavault` actor/author allowlists.
   Every adopting repository must replace these with an approved contributor
   and fork policy rather than simply deleting them.
