@@ -30,6 +30,7 @@ function countPullRequests(tier: RiskTier): number {
     .length;
 }
 
+// Acceptance probe: an app-shell comment should retain the MEDIUM floor.
 export function App(): ReactElement {
   const [filter, setFilter] = useState<TierFilter>('ALL');
   const [selectedPullRequestId, setSelectedPullRequestId] = useState(
