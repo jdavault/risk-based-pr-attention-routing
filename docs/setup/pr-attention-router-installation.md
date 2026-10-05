@@ -17,7 +17,7 @@ config/pr-attention-router/
   rules.json                        host path floors
   rubric.md                         host tier definitions
 .github/workflows/
-  pr-attention-review.yml           classify and publish
+  pr-attention-review.yml           evidence, classify, finalize, notify, publish
   <host validation>.yml             normal application checks
 ```
 
@@ -122,7 +122,9 @@ Preserve these properties:
 - never execute or install PR code in the attention workflow;
 - run Codex read-only with repository-read permissions only;
 - expose the OpenAI key only to classify;
-- expose comment writes and the Slack token only to publish;
+- expose `issues: write` and `pull-requests: write` only to Publish, because
+  this repository's PR-comment endpoint requires both, and expose the Slack
+  token only to Notify Slack;
 - use `cancel-in-progress: false` so cancellation cannot strand an alert.
 
 Because `workflow_run` loads from the default branch, exercise a changed
@@ -143,11 +145,11 @@ attention workflow with an acceptance PR after it lands.
 | Variable | `PAR_SLACK_ENABLED` | Exactly `true` enables Slack. |
 | Variable | `PAR_SLACK_CHANNEL_ID` | Destination channel containing the bot. |
 | Secret | `OPENAI_API_KEY` | Read-only classify job only. |
-| Secret | `SLACK_BOT_TOKEN` | Publish job only; requires `chat:write`. |
+| Secret | `SLACK_BOT_TOKEN` | Notify Slack job only; requires `chat:write`. |
 
 The PR comment is canonical. Email and Slack receive only tier/title,
 reviewer/floor, and URL. Plain unauthenticated SMTP uses Python's
-standard-library `smtplib` in publish, adding no router dependency. HIGH routes
+standard-library `smtplib` in the Notify email job, adding no router dependency. HIGH routes
 to the lead list; LOW/MEDIUM route to the team list. Both transports are
 best-effort and cannot change classification.
 

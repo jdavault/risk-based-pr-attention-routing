@@ -23,9 +23,10 @@
 
 ## Current Focus
 
-- Reduce the extracted router to the reviewed lean P3 contract: one generic
-  package module, host-owned rules and rubric, a two-job attention workflow,
-  and change-only email and Slack notifications.
+- Keep the extracted router aligned with the reviewed lean P3 contract: one
+  generic package module, host-owned rules and rubric, explicit evidence,
+  classification, finalization, notification, and publication stages, and
+  change-only email and Slack notifications.
 - After merge, open acceptance PRs to test the new default-branch
   `workflow_run` orchestration end to end.
 

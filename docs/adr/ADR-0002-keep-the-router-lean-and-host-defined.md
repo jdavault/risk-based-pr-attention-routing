@@ -34,9 +34,10 @@ classification problem requires.
   the first result or a tier change. Plain unauthenticated SMTP uses Python's
   standard-library `smtplib` in the trusted host workflow so the router package
   remains dependency-free. Both transports are best-effort.
-- The attention workflow retains separate read-only classify and write-capable
-  publish jobs. Human authority and the trusted/untrusted checkout boundary
-  from ADR-0001 remain unchanged.
+- The attention workflow uses explicit evidence, classify, finalize, email,
+  Slack, and publish jobs so every stage and notification outcome is visible.
+  Human authority and the trusted/untrusted checkout boundary from ADR-0001
+  remain unchanged.
 
 ## Consequences
 
@@ -56,3 +57,13 @@ ADR-0001 remains authoritative for classification-only scope and human
 approval/merge authority. Where ADR-0001's original implementation details
 name deterministic material-context handling or package-owned email, this ADR
 supersedes those details without expanding router authority.
+
+## Revision: explicit workflow stages
+
+The first lean workflow had two jobs, which hid stage and notification
+outcomes inside steps. The workflow now uses six visible jobs: Collect trusted
+evidence, Classify with Codex, Finalize attention result, Notify email, Notify
+Slack, and Publish attention result. This is an observability choice only: the
+package remains lean, classification stays in `route.ts`, and every job keeps
+least-privilege permissions. A failed alert is visible as its own failed job
+while the persistent comment still publishes.
