@@ -35,7 +35,7 @@ config/pr-attention-router/
   validate.yml
   pr-attention-review.yml
 apps/par-dashboard/
-  # optional display client; no router dependency or routing logic
+  # optional display client; imports package types, no routing or host policy
 ```
 
 The package contains no React, Vite, DOM, host paths, email transport, or
@@ -109,8 +109,10 @@ to change classification or prevent the persistent comment.
 ## Dashboard boundary
 
 `apps/par-dashboard` is an optional visual explanation of the concept. It owns
-its sample/display types and comment preview. It has no workspace dependency
-on the router and cannot be required to install, test, or run the package.
+its sample/display data and imports the package's public result types through a
+workspace dependency. Its browser bundle does not import the Node-only
+`route()` implementation; a typed synthetic `RouteResult` drives the comment
+preview. Adopting repositories do not need to install or run the dashboard.
 
 ## Configuration validation
 

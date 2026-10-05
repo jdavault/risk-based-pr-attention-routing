@@ -25,7 +25,7 @@
 
 - Reduce the extracted router to the reviewed lean P3 contract: one generic
   package module, host-owned rules and rubric, a two-job attention workflow,
-  and Slack-only change notifications.
+  and change-only email and Slack notifications.
 - After merge, open acceptance PRs to test the new default-branch
   `workflow_run` orchestration end to end.
 
@@ -47,8 +47,9 @@
 - Branch: `refactor/lean-pr-attention-router`
 - Focus: Port the reviewed P3 lean attention-router contract without using a
   worktree.
-- In progress: Replace the multi-module package and email path with a generic
-  `route.ts`, repository `rules.json`/`rubric.md`, two workflow jobs, and
-  Slack-only notification.
-- Next: Validate locally, review the complete branch, open a PR, and do not
-  merge without owner review.
+- Completed: Replaced the multi-module package with the generic P3 `route.ts`,
+  repository-owned `rules.json`/`rubric.md`, two workflow jobs, and thin
+  change-only email and Slack notifications.
+- Next: Validate the pull request on hosted Ubuntu, squash-merge after passing
+  checks, then exercise the landed workflow with harmless LOW, MEDIUM, and
+  HIGH probes.

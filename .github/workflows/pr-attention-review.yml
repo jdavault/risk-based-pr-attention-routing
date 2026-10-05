@@ -163,7 +163,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: write
 
     steps:
       - name: Check out trusted router and rules from the default branch

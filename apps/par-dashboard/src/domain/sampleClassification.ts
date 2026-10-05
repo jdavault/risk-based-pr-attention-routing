@@ -7,6 +7,8 @@ import type {
 
 import type { SamplePullRequest } from './attention';
 
+// This browser-only dashboard demonstrates the public result contract. The
+// canonical route() implementation is Node-only and runs in GitHub Actions.
 function sampleRules(pullRequest: SamplePullRequest): readonly Rule[] {
   if (pullRequest.tier === 'LOW') return [];
 

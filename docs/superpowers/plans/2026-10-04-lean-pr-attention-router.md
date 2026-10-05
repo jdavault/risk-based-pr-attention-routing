@@ -3,15 +3,15 @@
 **Spec:** `docs/superpowers/specs/2026-10-04-lean-pr-attention-router-design.md`
 
 **Goal:** Replace the current multi-module router with the proven P3 lean
-contract, adapt its host rubric to this repository, remove dashboard coupling,
-and preserve the workflow trust boundary.
+contract, adapt its host rubric to this repository, limit the dashboard to the
+public result contract, and preserve the workflow trust boundary.
 
 ## Global constraints
 
 - Work on `refactor/lean-pr-attention-router` in the current checkout; the
   owner explicitly rejected a worktree for this sequential task.
 - Use TDD for package and dashboard behavior.
-- Do not merge the resulting PR.
+- Merge only after the owner-authorized PR has passing hosted checks.
 - Keep `PAR_APP_WORKFLOWS_ENABLED`, `PAR_EMAIL_ENABLED`, and
   `PAR_SLACK_ENABLED` enabled; move email out of the package into a small
   dependency-free host workflow step without mutating repository variables.
@@ -33,12 +33,12 @@ repository-specific `rules.json` and explicit LOW/MEDIUM/HIGH `rubric.md`.
 Run `route.ts check` and confirm every individual glob matches a tracked path.
 Report counts by tier.
 
-## Task 3: Dashboard independence
+## Task 3: Dashboard client boundary
 
-Change dashboard tests first to require its own display model and comment
-preview. Move those types/rendering into `apps/par-dashboard`, remove its
-workspace dependency on the package, then run lint, typecheck, tests, and
-build.
+Change dashboard tests first to require the lean comment preview. Import only
+the package's public result types, keep the synthetic fixture in
+`apps/par-dashboard`, and avoid bundling the Node-only `route()` module. Then
+run lint, typecheck, tests, and build.
 
 ## Task 4: Workflows and root scripts
 
@@ -73,5 +73,6 @@ open a conventional PR. Do not merge.
 - AI cannot lower a floor; authority prose cannot reach the comment.
 - Email and Slack are thin, best-effort, and change-only; the comment remains
   canonical.
-- The dashboard builds without importing the router.
+- The dashboard builds using type-only package imports and no Node runtime
+  modules.
 - Every host rule names an existing path and matches the rubric.
