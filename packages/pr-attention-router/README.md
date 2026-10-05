@@ -1,19 +1,21 @@
-# PR Attention Router
+# @scope/pr-attention-router
 
-Small, application-independent classification engine for pull requests.
+Classification-only PR attention router. Code guarantees floors for sensitive files, failing
+CI, and big changes; the host repository's rubric defines LOW, MEDIUM, and HIGH; the AI applies
+that rubric and may raise the floor but never lower it.
 
-The host supplies `config/pr-attention-router/rules.json` for deterministic
-path floors and `rubric.md` for repository-specific LOW, MEDIUM, and HIGH
-definitions. Code also sets a MEDIUM floor when required validation fails or a
-change reaches 250 lines. AI may raise the floor but cannot lower it.
+This package is identical in every repository and contains no host paths.
 
-The workflow runs four native Node 22.18+ subcommands:
+| File | Role |
+| --- | --- |
+| `route.ts` | Floor, final tier, reviewer, comment, Slack text, prompt assembly, and the CLI |
+| `route.test.ts` | Generic tests with an in-memory fixture |
+| `classification-prompt.md` | Generic process and the four risk dimensions |
+| `classification.schema.json` | Codex output: tier, summary, reasons, reviewFocus |
 
-```text
-route.ts evidence <paths-z-file> <numstat-file> <verify-conclusion> <base-sha> <head-sha>
-route.ts prompt <adapter-dir> <evidence.json> <pull-request.json>
-route.ts route <adapter-dir> <evidence.json> <ai-output-file> <pull-request.json> [previous-tier]
-route.ts check <adapter-dir> <repo-root>
-```
+A host supplies `rules.json` and `rubric.md` in one directory and validates them with:
 
-The package has no runtime dependencies and no host application knowledge.
+    node packages/pr-attention-router/route.ts check <adapter-dir> <repo-root>
+
+Tested on Node 24 (TypeScript runs natively; `engines` allows 22.18+, which is untested). No
+runtime dependencies.

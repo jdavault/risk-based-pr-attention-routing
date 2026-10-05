@@ -18,6 +18,7 @@ export interface Rule {
   readonly paths: readonly string[];
   readonly why: string;
 }
+
 export interface Evidence {
   readonly base: string;
   readonly head: string;

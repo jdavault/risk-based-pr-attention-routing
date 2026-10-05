@@ -72,10 +72,12 @@ describe('App', () => {
       screen.getByText('Persistent PR comment preview'),
     );
 
-    const preview = screen.getByText(/## PR Attention Review — HIGH/u);
+    const preview = screen.getByText(/## PR Attention Review: HIGH/u);
     expect(preview).toHaveTextContent(
       '**Reviewer:** Tech Lead or relevant SME',
     );
+    expect(preview).toHaveTextContent('**Deterministic floor:** HIGH');
+    expect(preview).toHaveTextContent('### Reasons');
     expect(preview).not.toHaveTextContent('[object Object]');
   });
 });

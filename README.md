@@ -36,59 +36,12 @@ deterministic floor.
 
 ## Attention Tiers
 
-### Low: Lightweight Human Review
-
-Examples:
-
-- Localized dashboard component copy, markup, style, or accessibility changes,
-  such as `TierCard.tsx` and its CSS module
-- Reference or explanatory documentation outside operational runbooks, ADRs,
-  and installation guidance
-- Isolated dashboard changes that do not alter the shared app shell, sample
-  data, domain contracts, package configuration, or routing behavior
-
-**Reviewer:** A developer familiar with the affected area.
-
-### Medium: Targeted Human Review
-
-Examples:
-
-- The dashboard app shell, entry point, shared domain types, sample data, or
-  global styles
-- Root or dashboard dependency, TypeScript, Vite, and ESLint configuration
-- Operational runbooks, ADRs, and installation guidance
-- The pull-request template or other non-workflow GitHub configuration
-- Repository agent instructions
-- Failed required validation or 250 or more changed lines
-
-**Blast radius:** Multiple consumers, workflows, or features could be
-affected.
-
-**Review focus:** Identify the specific areas that require reviewer attention.
-
-**Reviewer:** A developer familiar with the affected area.
-
-### High: Tech Lead or SME Review
-
-Examples:
-
-- Any file under `.github/workflows/`, because a mistake could bypass
-  validation, weaken the trust boundary, expose credentials, or misclassify a
-  pull request
-- Any file in `packages/pr-attention-router/`, because a mistake could affect
-  every classification, floor-enforcement decision, persistent comment, or
-  notification
-- Any file in `config/pr-attention-router/`, because a mistake could assign the
-  wrong deterministic floor or provide incorrect host context to Codex
-
-**Blast radius:** Every pull request classified by this POC could be affected.
-
-**Reviewer:** A Tech Lead or relevant subject-matter expert.
-
-This repository has no sitemap, production SEO surface, authentication,
-payment flow, database, or migration path. Those concerns are not V1 rules
-here; an adopting repository adds them to its own host policy only when the
-corresponding paths actually exist.
+The repository-owned
+[rubric](config/pr-attention-router/rubric.md) is the single source for LOW,
+MEDIUM, and HIGH definitions, examples, blast radius, and review focus. The
+router derives reviewer authority from the final tier: HIGH requires a Tech
+Lead or relevant SME; LOW and MEDIUM require a developer familiar with the
+affected area.
 
 ## Signals and Context
 
@@ -139,10 +92,11 @@ The workflows and workspaces stay separate:
 - `PR Attention Review` runs after validation succeeds, fails, or times out.
   Its read-only classify job loads trusted code and host rules, inspects the PR
   in a separate checkout, and requests structured Codex judgment. Its publish
-  job sees no PR source, updates one persistent comment, and may send Slack.
-- `apps/par-dashboard` owns only its synthetic display model and preview. It
-  has no package dependency and contains no routing, policy, GitHub, or Slack
-  logic.
+  job sees no PR source, updates one persistent comment, and may send email and
+  Slack alerts.
+- `apps/par-dashboard` is an optional client of the package's public
+  `RouteResult` contract. It owns only its synthetic display model and contains
+  no host policy, GitHub, email, or Slack logic.
 
 The POC runs on GitHub-hosted `ubuntu-24.04` runners with Node 24. Codex uses
 the action's built-in `read-only` safety strategy. A retired local-runner

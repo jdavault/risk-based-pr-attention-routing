@@ -1,4 +1,6 @@
-export type RiskTier = 'LOW' | 'MEDIUM' | 'HIGH';
+import type { Tier } from '@scope/pr-attention-router/route.ts';
+
+export type RiskTier = Tier;
 export type ReviewerType = 'NON_LEAD_DEVELOPER' | 'TECH_LEAD_OR_SME';
 
 export interface RiskDimension {

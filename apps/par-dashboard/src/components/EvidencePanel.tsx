@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react';
 
 import type { RiskDimension, SamplePullRequest } from '../domain/attention';
-import { renderClassificationComment } from '../domain/renderClassificationComment';
 import { toSampleClassification } from '../domain/sampleClassification';
 import styles from './EvidencePanel.module.css';
 
@@ -29,9 +28,7 @@ function Dimension({ label, dimension }: DimensionProps): ReactElement {
 export function EvidencePanel({
   pullRequest,
 }: EvidencePanelProps): ReactElement {
-  const comment = renderClassificationComment(
-    toSampleClassification(pullRequest),
-  );
+  const comment = toSampleClassification(pullRequest).comment;
 
   return (
     <aside className={styles.panel} aria-labelledby="evidence-heading">

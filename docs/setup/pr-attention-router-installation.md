@@ -3,9 +3,9 @@
 ## Installation boundary
 
 The router classifies required human attention as `LOW`, `MEDIUM`, or `HIGH`,
-updates one persistent pull-request comment, and may send a short Slack alert
-when the tier first appears or changes. It never approves, merges, deploys,
-releases, or modifies pull-request source.
+updates one persistent pull-request comment, and may send short email and Slack
+alerts when the tier first appears or changes. It never approves, merges,
+deploys, releases, or modifies pull-request source.
 
 It is application-independent. React, React Native, NestJS, and Turborepo
 repositories use the same package and workflow; each writes its own rules and
@@ -21,8 +21,10 @@ config/pr-attention-router/
   <host validation>.yml             normal application checks
 ```
 
-The optional `apps/par-dashboard` is not installed and does not depend on the
-package.
+The optional `apps/par-dashboard` is not installed by adopting repositories.
+In this reference repository it is a client of the package's public `route()`
+result types, not part of the workflow installation contract. It does not
+bundle the Node-only CLI into the browser.
 
 ## Package-to-host contract
 
@@ -137,7 +139,7 @@ attention workflow with an acceptance PR after it lands.
 | Variable | `PAR_EMAIL_TO_TEAM` | LOW/MEDIUM recipients, comma-delimited. |
 | Variable | `PAR_EMAIL_TO_LEAD` | HIGH recipients, comma-delimited. |
 | Variable | `SMTP_HOST` | Runner-reachable unauthenticated SMTP host. |
-| Variable | `SMTP_PORT` | SMTP port; defaults to `25`. |
+| Variable | `SMTP_PORT` | Required SMTP port, normally `25` or the ngrok TCP port. |
 | Variable | `PAR_SLACK_ENABLED` | Exactly `true` enables Slack. |
 | Variable | `PAR_SLACK_CHANNEL_ID` | Destination channel containing the bot. |
 | Secret | `OPENAI_API_KEY` | Read-only classify job only. |

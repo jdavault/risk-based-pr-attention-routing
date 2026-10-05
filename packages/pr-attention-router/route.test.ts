@@ -50,6 +50,7 @@ test('deterministic floor', async (t) => {
     });
   }
 });
+
 test('HIGH wins and lists only HIGH reasons', () => {
   const floor = evaluateFloor(
     { ...quiet, changedPaths: ['src/payments/charge.ts', 'src/ui/Button.tsx'] },

@@ -1,14 +1,14 @@
 # Classification-only PR attention router. Code sets a floor from path rules,
 # failing CI, and change size; Codex applies the repository rubric and may
 # raise it; the higher tier wins. It never approves, merges, deploys, or
-# changes PR source. Its only writes are one PR comment plus short email and
-# Slack alerts. See docs/runbooks/pr-attention-notification.md.
+# changes PR source. Its only writes are one PR comment and a short Slack
+# and email alert. See docs/runbooks/pr-attention-notification.md.
 #
 # Trust model: workflow_run always loads this file from the default branch,
 # and both jobs check the router and host config out at github.sha. Only
 # classify checks out the PR head (under .par/target), and only reads it.
-# classify holds the OpenAI key and cannot write; publish can comment and send
-# notifications but never sees PR code.
+# classify holds the OpenAI key and cannot write; publish can comment, post to
+# Slack, and send email but never sees PR code.
 name: PR Attention Review
 
 on:
@@ -239,60 +239,6 @@ jobs:
               });
             }
 
-      # Plain, unauthenticated SMTP is a host concern. Python's standard
-      # library keeps the reusable router package dependency-free.
-      - name: Send the email alert on the first result or a tier change
-        if: vars.PAR_EMAIL_ENABLED == 'true'
-        continue-on-error: true
-        env:
-          SMTP_HOST: ${{ vars.SMTP_HOST }}
-          SMTP_PORT: ${{ vars.SMTP_PORT }}
-          PAR_EMAIL_FROM: ${{ vars.PAR_EMAIL_FROM }}
-          PAR_EMAIL_TO_TEAM: ${{ vars.PAR_EMAIL_TO_TEAM }}
-          PAR_EMAIL_TO_LEAD: ${{ vars.PAR_EMAIL_TO_LEAD }}
-        run: |
-          if [ "$(jq -r .shouldNotify .par/result.json)" != true ]; then
-            echo 'Tier unchanged; no email alert.'
-            exit 0
-          fi
-
-          python3 - <<'PY'
-          import json
-          import os
-          import smtplib
-          from email.message import EmailMessage
-
-          with open('.par/result.json', encoding='utf-8') as result_file:
-              result = json.load(result_file)
-
-          recipient_variable = (
-              'PAR_EMAIL_TO_LEAD'
-              if result['finalTier'] == 'HIGH'
-              else 'PAR_EMAIL_TO_TEAM'
-          )
-          recipients = [
-              address.strip()
-              for address in os.environ[recipient_variable].split(',')
-              if address.strip()
-          ]
-          if not recipients:
-              raise ValueError(f'{recipient_variable} contains no recipients')
-
-          summary = result['notificationSummary']
-          message = EmailMessage()
-          message['From'] = os.environ['PAR_EMAIL_FROM']
-          message['To'] = ', '.join(recipients)
-          message['Subject'] = summary.splitlines()[0]
-          message.set_content(summary)
-
-          with smtplib.SMTP(
-              os.environ['SMTP_HOST'],
-              int(os.environ.get('SMTP_PORT', '25')),
-              timeout=15,
-          ) as client:
-              client.send_message(message, to_addrs=recipients)
-          PY
-
       # After the comment, and never able to fail the run.
       - name: Send the Slack alert on the first result or a tier change
         if: vars.PAR_SLACK_ENABLED == 'true'
@@ -311,3 +257,41 @@ jobs:
             -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
             -H 'Content-Type: application/json; charset=utf-8' \
             --data @.par/slack.json | jq -e '.ok == true'
+
+      # Same rule and lines as Slack: HIGH goes to the lead list, LOW and MEDIUM to
+      # the team list. Python's smtplib keeps the router package dependency-free.
+      - name: Send the email alert on the first result or a tier change
+        if: vars.PAR_EMAIL_ENABLED == 'true'
+        continue-on-error: true
+        env:
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          PAR_EMAIL_FROM: ${{ vars.PAR_EMAIL_FROM }}
+          PAR_EMAIL_TO_TEAM: ${{ vars.PAR_EMAIL_TO_TEAM }}
+          PAR_EMAIL_TO_LEAD: ${{ vars.PAR_EMAIL_TO_LEAD }}
+        shell: python
+        run: |
+          import json, os, smtplib
+          from email.message import EmailMessage
+
+          with open('.par/result.json', encoding='utf-8') as file:
+              result = json.load(file)
+          if not result['shouldNotify']:
+              print('Tier unchanged; no email alert.')
+              raise SystemExit(0)
+
+          variable = 'PAR_EMAIL_TO_LEAD' if result['finalTier'] == 'HIGH' else 'PAR_EMAIL_TO_TEAM'
+          recipients = [address.strip() for address in os.environ[variable].split(',') if address.strip()]
+          if not recipients:
+              raise SystemExit(f'{variable} has no recipients.')
+
+          summary = result['notificationSummary']
+          message = EmailMessage()
+          message['From'] = os.environ['PAR_EMAIL_FROM']
+          message['To'] = ', '.join(recipients)
+          message['Subject'] = summary.split('\n', 1)[0]
+          message.set_content(summary + '\n')
+
+          with smtplib.SMTP(os.environ['SMTP_HOST'], int(os.environ['SMTP_PORT']), timeout=30) as smtp:
+              smtp.send_message(message)
+          print(f"Emailed {len(recipients)} recipient(s) for {result['finalTier']}.")
