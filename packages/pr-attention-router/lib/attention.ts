@@ -6,5 +6,5 @@ export interface DeterministicAssessment {
   readonly reviewerType: ReviewerType;
   readonly rationale: readonly string[];
   readonly missingEvidence: readonly string[];
-  readonly matchedRuleIds?: readonly string[];
+  readonly matchedRuleIds: readonly string[];
 }

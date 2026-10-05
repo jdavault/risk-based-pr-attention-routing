@@ -13,6 +13,7 @@ const mediumFloor: DeterministicAssessment = {
   reviewerType: 'NON_LEAD_DEVELOPER',
   rationale: ['Shared hook or service changed.'],
   missingEvidence: [],
+  matchedRuleIds: [],
 };
 
 const lowAiClassification: AiClassification = {
