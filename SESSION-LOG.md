@@ -1,5 +1,64 @@
 # Session Log
 
+## 2026-10-06 — Lean workflow acceptance and demo closeout
+
+### What was built
+
+- Simplified the router to the lean, application-independent package contract
+  in `packages/pr-attention-router` with host-owned `rules.json` and
+  `rubric.md`.
+- Restored the explicit six-stage GitHub Actions graph without adding router
+  machinery: evidence, Codex classification, finalization, parallel email and
+  Slack notification, and persistent comment publication.
+- Added a demo-ready acceptance report with the deterministic and AI rationale
+  for LOW, MEDIUM, and HIGH probes plus smtp4dev and Slack screenshots.
+
+### Verified behavior
+
+- PR #17 finished LOW from a component-local `TierCard.tsx` comment.
+- PR #18 finished MEDIUM from the shared dashboard `App.tsx` path.
+- PR #19 finished HIGH from the workflow path.
+- All six workflow stages passed for all three probes, including email, Slack,
+  and PR comment publication.
+- PR #20, the acceptance report, received the expected operational-guidance
+  MEDIUM floor and was squash-merged.
+- The sandbox workflow was compared with committed P3 workflow `e9fb221`;
+  only the host validation name and runbook path differ.
+
+### Technical decisions
+
+- Keep detailed rationale in the persistent PR comment and keep email and
+  Slack deliberately thin and change-only.
+- Preserve the proven `issues: write` plus `pull-requests: write` pair for PR
+  comment publication: `issues: write` alone produced a live 403, and adding
+  `pull-requests: write` fixed it. The inverse combination was not tested.
+- Keep plain unauthenticated SMTP in runner-native Python for the POC. Move to
+  an approved Node/Nodemailer adapter only when richer mail requirements exist.
+- Keep deterministic rules as a defensible subset of the semantic rubric.
+
+### Issues, debt, and parked work
+
+- PRs #17, #18, and #19 are disposable acceptance probes and remain open;
+  close them without merging after owner confirmation.
+- An upstream JavaScript action still produces a Node 20 deprecation warning
+  while GitHub forces it to Node 24.
+- `openai/codex-action@v1.8` currently receives `OPENAI_API_KEY` with
+  `safety-strategy: read-only`; its official guidance says GitHub-hosted
+  passwordless sudo can expose the key. Test `drop-sudo` or
+  `unprivileged-user` before broader adoption.
+- Demo screenshots expose personal sandbox identities and the ngrok test host;
+  redact them before broader distribution.
+- SmartBites mobile is the intended next portability exercise, but ADR-0001's
+  repository boundary must be amended or superseded with owner approval before
+  installation or live execution there.
+
+### Repository state at closeout
+
+- Stable baseline on `main`: `fc2a2e8` before this handoff.
+- PRs #15, #16, and #20 are squash-merged.
+- Email, Slack, and application workflows remain enabled for the POC.
+- Full next-session context is in [`handoff.md`](handoff.md).
+
 ## 2026-10-04 — Application-independent router extraction
 
 - Branch: `refactor/extract-pr-attention-router`; PR #11.
