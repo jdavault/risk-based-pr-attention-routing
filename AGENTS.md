@@ -23,14 +23,29 @@
 
 ## Current Focus
 
-- Keep the extracted router aligned with the reviewed lean P3 contract: one
-  generic package module, host-owned rules and rubric, explicit evidence,
-  classification, finalization, notification, and publication stages, and
-  change-only email and Slack notifications.
-- After merge, open acceptance PRs to test the new default-branch
-  `workflow_run` orchestration end to end.
+- Treat the lean sandbox baseline as the reference implementation.
+- Before installing or running the router in SmartBites or another repository,
+  obtain owner approval and amend or supersede ADR-0001's enumerated isolation
+  boundary. Read-only inspection and design may proceed meanwhile.
+- Keep package code generic and keep every adopting repository's path rules and
+  semantic tier rubric host-owned.
+- Close disposable acceptance PRs #17–#19 without merging after owner
+  confirmation; their results are preserved in the acceptance report.
 
 ## Session Log
+
+### Session 2026-10-06
+
+- Branch: `docs/session-closeout-2026-10-06`.
+- Focus: Complete the lean workflow acceptance cycle and preserve a fresh-
+  context handoff.
+- Completed: Explicit six-stage workflow alignment, LOW/MEDIUM/HIGH hosted
+  acceptance probes, successful email and Slack delivery, demo report and
+  screenshots, direct P3 workflow comparison, and session handoff.
+- In Progress: Disposable PRs #17–#19 remain open pending owner-confirmed
+  closure.
+- Next: Read `handoff.md`, close the probes without merging when confirmed,
+  then resolve the ADR-0001 scope gate before any SmartBites installation.
 
 ### Session 2026-10-04
 
@@ -39,9 +54,8 @@
 - Completed: Package extraction, host policy adapter, executable workflow
   trust contract, P3-aligned workflow wiring, isolated CI jobs, and dashboard
   rename/decoupling.
-- In Progress: PR #11 hosted validation and post-merge acceptance testing.
-- Next: Verify package/policy/dashboard checks, merge only after owner review,
-  then exercise the landed workflow with a harmless classification PR.
+- Completed later: PR #11 hosted validation, merge, and the LOW/MEDIUM/HIGH
+  acceptance cycle described in the 2026-10-06 entry.
 
 ### Session 2026-10-04 — Lean router
 
@@ -51,6 +65,5 @@
 - Completed: Replaced the multi-module package with the generic P3 `route.ts`,
   repository-owned `rules.json`/`rubric.md`, two workflow jobs, and thin
   change-only email and Slack notifications.
-- Next: Validate the pull request on hosted Ubuntu, squash-merge after passing
-  checks, then exercise the landed workflow with harmless LOW, MEDIUM, and
-  HIGH probes.
+- Completed later: hosted Ubuntu validation, squash merge, and all three
+  acceptance probes described in the 2026-10-06 entry.
