@@ -16,6 +16,11 @@ describe('App', () => {
     expect(
       screen.getByText('Proof of concept • Classification only.'),
     ).toBeVisible();
+    expect(
+      screen.getByText(
+        'Direct human review toward changes with greater probability of failure, higher impact, weaker detection, or broader blast radius.',
+      ),
+    ).toBeVisible();
     expect(screen.getByText('Human authority preserved')).toBeVisible();
     expect(
       screen.getAllByText('Developer familiar with the affected area').length,
