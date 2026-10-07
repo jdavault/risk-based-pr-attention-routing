@@ -3,8 +3,8 @@
  * and big changes; the host rubric defines LOW, MEDIUM, and HIGH; the AI
  * applies that rubric and may raise the floor but can never lower it.
  *
- * Pure functions first; the CLI the workflow calls is at the bottom.
  */
+
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
@@ -95,7 +95,10 @@ function isTextList(value: unknown): value is readonly string[] {
  * only ever adds matches, so it can only raise a floor.
  */
 export function pathMatches(path: string, glob: string): boolean {
-  return matchesGlob(path, glob) || matchesGlob(path.replace(/(^|\/)\./gu, '$1'), glob);
+  return (
+    matchesGlob(path, glob) ||
+    matchesGlob(path.replace(/(^|\/)\./gu, '$1'), glob)
+  );
 }
 
 export function reviewerFor(tier: Tier): string {
@@ -113,7 +116,11 @@ export function parsePaths(nulSeparated: string): string[] {
 export function countChangedLines(numstat: string): number {
   return numstat.split('\n').reduce((total, line) => {
     const [added = '', deleted = ''] = line.split('\t');
-    return total + (Number.parseInt(added, 10) || 0) + (Number.parseInt(deleted, 10) || 0);
+    return (
+      total +
+      (Number.parseInt(added, 10) || 0) +
+      (Number.parseInt(deleted, 10) || 0)
+    );
   }, 0);
 }
 
@@ -127,7 +134,10 @@ export function parseAiOutput(text: string): unknown {
 }
 
 export function evaluateFloor(
-  evidence: Pick<Evidence, 'changedPaths' | 'changedLines' | 'validationPassed'>,
+  evidence: Pick<
+    Evidence,
+    'changedPaths' | 'changedLines' | 'validationPassed'
+  >,
   rules: readonly Rule[],
 ): Floor {
   const high: string[] = [];
@@ -140,13 +150,20 @@ export function evaluateFloor(
     if (matched.length === 0) continue;
 
     const extra = matched.length - maximumListedPaths;
-    const listed = matched.slice(0, maximumListedPaths).join(', ') + (extra > 0 ? `, +${extra} more` : '');
-    (rule.tier === 'HIGH' ? high : medium).push(`${rule.why} [${rule.id}: ${listed}]`);
+    const listed =
+      matched.slice(0, maximumListedPaths).join(', ') +
+      (extra > 0 ? `, +${extra} more` : '');
+    (rule.tier === 'HIGH' ? high : medium).push(
+      `${rule.why} [${rule.id}: ${listed}]`,
+    );
   }
 
-  if (!evidence.validationPassed) medium.push('Required validation did not pass.');
+  if (!evidence.validationPassed)
+    medium.push('Required validation did not pass.');
   if (evidence.changedLines >= largeChangeLines) {
-    medium.push(`${evidence.changedLines} changed lines (${largeChangeLines} or more).`);
+    medium.push(
+      `${evidence.changedLines} changed lines (${largeChangeLines} or more).`,
+    );
   }
 
   // Only the reasons at the floor's tier are reported, so a path that matches
@@ -160,7 +177,10 @@ export function evaluateFloor(
 export function parseAiClassification(value: unknown): AiClassification | null {
   if (typeof value !== 'object' || value === null) return null;
 
-  const { tier, summary, reasons, reviewFocus } = value as Record<string, unknown>;
+  const { tier, summary, reasons, reviewFocus } = value as Record<
+    string,
+    unknown
+  >;
   if (
     !isTier(tier) ||
     typeof summary !== 'string' ||
@@ -175,11 +195,16 @@ export function parseAiClassification(value: unknown): AiClassification | null {
 
 /** True when the AI's prose approves, waves through, or dismisses review. */
 export function containsAuthorityLanguage(ai: AiClassification): boolean {
-  return authorityLanguage.test([ai.summary, ...ai.reasons, ...ai.reviewFocus].join('\n'));
+  return authorityLanguage.test(
+    [ai.summary, ...ai.reasons, ...ai.reviewFocus].join('\n'),
+  );
 }
 
 function clean(text: string): string {
-  return text.replaceAll('@', '@​').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  return text
+    .replaceAll('@', '@​')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
 
 /** Comment text: also escapes brackets so paths and AI text cannot render links or images. */
@@ -198,23 +223,25 @@ function renderComment(
   textWithheld: boolean,
 ): string {
   const floorReasons =
-    floor.reasons.length > 0 ? bulletList(floor.reasons) : '- No deterministic signals.';
+    floor.reasons.length > 0
+      ? bulletList(floor.reasons)
+      : '- No deterministic signals.';
   const analysis =
     ai === null
       ? '> AI unavailable; using deterministic floor.'
       : textWithheld
         ? '> AI text withheld (authority language).'
         : [
-          cleanMarkdown(ai.summary),
-          '',
-          '### Reasons',
-          '',
-          bulletList(ai.reasons),
-          '',
-          '### Review focus',
-          '',
-          bulletList(ai.reviewFocus),
-        ].join('\n');
+            cleanMarkdown(ai.summary),
+            '',
+            '### Reasons',
+            '',
+            bulletList(ai.reasons),
+            '',
+            '### Review focus',
+            '',
+            bulletList(ai.reviewFocus),
+          ].join('\n');
 
   return [
     `<!-- par:v1 tier=${finalTier} -->`,
@@ -233,7 +260,11 @@ function renderComment(
   ].join('\n');
 }
 
-function renderNotificationSummary(finalTier: Tier, floor: Floor, pullRequest: PullRequest): string {
+function renderNotificationSummary(
+  finalTier: Tier,
+  floor: Floor,
+  pullRequest: PullRequest,
+): string {
   return [
     `[${finalTier}] PR #${pullRequest.number}: ${clean(pullRequest.title)}`,
     `Reviewer: ${reviewerFor(finalTier)} · Floor: ${floor.tier}`,
@@ -247,7 +278,9 @@ export function route(input: RouteInput): RouteResult {
   // Authority language withholds the AI's text, never its tier: the tier can only raise the floor.
   const textWithheld = ai !== null && containsAuthorityLanguage(ai);
   const finalTier =
-    ai !== null && tierRank[ai.tier] > tierRank[floor.tier] ? ai.tier : floor.tier;
+    ai !== null && tierRank[ai.tier] > tierRank[floor.tier]
+      ? ai.tier
+      : floor.tier;
 
   return {
     deterministicFloor: floor.tier,
@@ -257,7 +290,11 @@ export function route(input: RouteInput): RouteResult {
     aiUsed: ai !== null,
     aiTextWithheld: textWithheld,
     comment: renderComment(finalTier, floor, ai, textWithheld),
-    notificationSummary: renderNotificationSummary(finalTier, floor, input.pullRequest),
+    notificationSummary: renderNotificationSummary(
+      finalTier,
+      floor,
+      input.pullRequest,
+    ),
     shouldNotify: input.previousTier !== finalTier,
   };
 }
@@ -322,12 +359,17 @@ export function validateConfig(
   }
 
   const rules =
-    typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>).rules : undefined;
-  if (parsed !== undefined && !Array.isArray(rules)) failures.push('rules.json must have a "rules" array.');
+    typeof parsed === 'object' && parsed !== null
+      ? (parsed as Record<string, unknown>).rules
+      : undefined;
+  if (parsed !== undefined && !Array.isArray(rules))
+    failures.push('rules.json must have a "rules" array.');
 
   const seen = new Set<string>();
   for (const [index, rule] of (Array.isArray(rules) ? rules : []).entries()) {
-    const { id, tier, paths, why } = (typeof rule === 'object' && rule !== null ? rule : {}) as Record<string, unknown>;
+    const { id, tier, paths, why } = (
+      typeof rule === 'object' && rule !== null ? rule : {}
+    ) as Record<string, unknown>;
     const hasId = typeof id === 'string' && id.trim().length > 0;
     const name = hasId ? id : `rule ${index + 1}`;
 
@@ -335,8 +377,10 @@ export function validateConfig(
     else if (seen.has(name)) failures.push(`${name}: duplicate id.`);
     else seen.add(name);
 
-    if (tier !== 'HIGH' && tier !== 'MEDIUM') failures.push(`${name}: tier must be HIGH or MEDIUM.`);
-    if (typeof why !== 'string' || why.trim().length === 0) failures.push(`${name}: missing why.`);
+    if (tier !== 'HIGH' && tier !== 'MEDIUM')
+      failures.push(`${name}: tier must be HIGH or MEDIUM.`);
+    if (typeof why !== 'string' || why.trim().length === 0)
+      failures.push(`${name}: missing why.`);
     if (!isTextList(paths)) {
       failures.push(`${name}: paths must be a non-empty list of globs.`);
       continue;
@@ -366,21 +410,31 @@ function readText(path: string): string {
 }
 
 /** Reads and validates `rules.json` and `rubric.md` from a host adapter directory. */
-export function loadAdapter(adapterDir: string): { readonly rules: readonly Rule[]; readonly rubric: string } {
+export function loadAdapter(adapterDir: string): {
+  readonly rules: readonly Rule[];
+  readonly rubric: string;
+} {
   const rulesText = readText(join(adapterDir, 'rules.json'));
   const rubric = readText(join(adapterDir, 'rubric.md'));
   const failures = validateConfig(rulesText, rubric, null);
 
   if (failures.length > 0) {
-    throw new Error(`Invalid attention-router config in ${adapterDir}:\n${failures.join('\n')}`);
+    throw new Error(
+      `Invalid attention-router config in ${adapterDir}:\n${failures.join('\n')}`,
+    );
   }
 
   return { rules: (JSON.parse(rulesText) as { rules: Rule[] }).rules, rubric };
 }
 
-function argument(values: readonly string[], index: number, name: string): string {
+function argument(
+  values: readonly string[],
+  index: number,
+  name: string,
+): string {
   const value = values[index];
-  if (value === undefined || value.length === 0) throw new Error(`Missing <${name}>.\n${usage}`);
+  if (value === undefined || value.length === 0)
+    throw new Error(`Missing <${name}>.\n${usage}`);
   return value;
 }
 
@@ -402,7 +456,9 @@ function main(args: readonly string[]): void {
       base: argument(rest, 3, 'base-sha'),
       head: argument(rest, 4, 'head-sha'),
       changedPaths: parsePaths(readText(argument(rest, 0, 'paths-z-file'))),
-      changedLines: countChangedLines(readText(argument(rest, 1, 'numstat-file'))),
+      changedLines: countChangedLines(
+        readText(argument(rest, 1, 'numstat-file')),
+      ),
       validationPassed: argument(rest, 2, 'verify-conclusion') === 'success',
     };
     // One line, so the workflow can pass it as a step output.
@@ -413,10 +469,14 @@ function main(args: readonly string[]): void {
   if (command === 'prompt') {
     const { rules, rubric } = loadAdapter(argument(rest, 0, 'adapter-dir'));
     const evidence = readJson<Evidence>(argument(rest, 1, 'evidence.json'));
-    const pullRequest = readJson<{ title: string; body?: string }>(argument(rest, 2, 'pull-request.json'));
+    const pullRequest = readJson<{ title: string; body?: string }>(
+      argument(rest, 2, 'pull-request.json'),
+    );
     process.stdout.write(
       buildPrompt({
-        genericPrompt: readText(fileURLToPath(new URL('./classification-prompt.md', import.meta.url))),
+        genericPrompt: readText(
+          fileURLToPath(new URL('./classification-prompt.md', import.meta.url)),
+        ),
         rubric,
         evidence,
         floor: evaluateFloor(evidence, rules),
@@ -436,9 +496,13 @@ function main(args: readonly string[]): void {
       changedLines: evidence.changedLines,
       validationPassed: evidence.validationPassed,
       rules,
-      aiClassification: parseAiOutput(readText(argument(rest, 2, 'ai-output-file'))),
+      aiClassification: parseAiOutput(
+        readText(argument(rest, 2, 'ai-output-file')),
+      ),
       previousTier: isTier(previousTier) ? previousTier : null,
-      pullRequest: readJson<PullRequest>(argument(rest, 3, 'pull-request.json')),
+      pullRequest: readJson<PullRequest>(
+        argument(rest, 3, 'pull-request.json'),
+      ),
     });
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
@@ -447,7 +511,10 @@ function main(args: readonly string[]): void {
   if (command === 'check') {
     const adapterDir = argument(rest, 0, 'adapter-dir');
     const trackedFiles = parsePaths(
-      execFileSync('git', ['ls-files', '-z'], { cwd: argument(rest, 1, 'repo-root'), encoding: 'utf8' }),
+      execFileSync('git', ['ls-files', '-z'], {
+        cwd: argument(rest, 1, 'repo-root'),
+        encoding: 'utf8',
+      }),
     );
     const failures = validateConfig(
       readText(join(adapterDir, 'rules.json')),
@@ -457,7 +524,9 @@ function main(args: readonly string[]): void {
 
     for (const failure of failures) process.stderr.write(`FAIL ${failure}\n`);
     process.stdout.write(
-      failures.length === 0 ? `${adapterDir} is valid.\n` : `${failures.length} config problem(s).\n`,
+      failures.length === 0
+        ? `${adapterDir} is valid.\n`
+        : `${failures.length} config problem(s).\n`,
     );
     if (failures.length > 0) process.exitCode = 1;
     return;

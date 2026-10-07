@@ -19,14 +19,19 @@
       "why": "If the host rules or rubric break unnoticed, repository changes can be systematically misclassified."
     },
     {
-      "id": "dashboard-shared-surfaces",
+      "id": "dashboard-application-shell",
       "tier": "MEDIUM",
       "paths": [
         "apps/par-dashboard/src/{App,main}.tsx",
-        "apps/par-dashboard/src/{domain,data}/**",
         "apps/par-dashboard/src/{global,App.module}.css"
       ],
-      "why": "If the dashboard shell, shared model, or sample data breaks unnoticed, multiple views can explain the routing model incorrectly."
+      "why": "If the dashboard shell, entry point, or shared styling breaks unnoticed, multiple views or interactions can present the routing model incorrectly."
+    },
+    {
+      "id": "dashboard-shared-contracts",
+      "tier": "MEDIUM",
+      "paths": ["apps/par-dashboard/src/{domain,data}/**"],
+      "why": "If shared domain types, router-result presentation, or sample-data shapes break unnoticed, multiple dashboard components can present inconsistent or incorrect classifications."
     },
     {
       "id": "dashboard-build",
@@ -44,6 +49,12 @@
       "tier": "MEDIUM",
       "paths": ["package.json", "package-lock.json"],
       "why": "If workspace dependency configuration breaks unnoticed, package and dashboard validation can fail together."
+    },
+    {
+      "id": "public-content-evidence",
+      "tier": "MEDIUM",
+      "paths": ["apps/par-dashboard/public/assets/**"],
+      "why": "If public screenshots or content evidence are wrong or expose identities or external endpoints, the demonstration can mislead viewers or disclose unintended information."
     },
     {
       "id": "operational-guidance",
