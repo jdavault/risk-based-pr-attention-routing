@@ -28,6 +28,7 @@ describe('App', () => {
 
     const queue = screen.getByRole('region', { name: 'Review queue' });
     expect(within(queue).getByText('3 shown')).toBeVisible();
+    expect(screen.getAllByText('Show tier queue')).toHaveLength(3);
 
     await user.click(
       screen.getByRole('button', {
