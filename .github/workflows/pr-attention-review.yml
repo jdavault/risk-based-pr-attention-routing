@@ -202,7 +202,8 @@ jobs:
         id: codex
         if: vars.PAR_AI_ENABLED != 'false'
         continue-on-error: true
-        # Under the job's 20 minutes, so a hung Codex still leaves this job green.
+        # Keep this below the job's 20-minute limit so a Codex timeout still
+        # allows deterministic finalization.
         timeout-minutes: 12
         uses: openai/codex-action@v1.8
         with:
