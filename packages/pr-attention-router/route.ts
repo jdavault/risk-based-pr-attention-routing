@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * PR attention router. Code guarantees floors for sensitive paths, failing CI,
  * and big changes; the host rubric defines LOW, MEDIUM, and HIGH; the AI
@@ -6,9 +7,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEngineeringContext } from './context.ts';
 
 export type Tier = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -300,6 +302,7 @@ export function route(input: RouteInput): RouteResult {
 }
 
 export interface PromptInput {
+  readonly engineeringContext?: string;
   readonly genericPrompt: string;
   readonly rubric: string;
   readonly evidence: Evidence;
@@ -331,6 +334,9 @@ export function buildPrompt(input: PromptInput): string {
     '# Repository rubric',
     '',
     input.rubric.trim(),
+    '',
+    '# Trusted engineering context (default-branch policy checkout)',
+    input.engineeringContext || '(No engineering context configured.)',
     '',
     '# Deterministic floor',
     '',
@@ -439,10 +445,10 @@ function argument(
 }
 
 const usage = `Usage:
-  route.ts evidence <paths-z-file> <numstat-file> <verify-conclusion> <base-sha> <head-sha>
-  route.ts prompt <adapter-dir> <evidence.json> <pull-request.json>
-  route.ts route <adapter-dir> <evidence.json> <ai-output-file> <pull-request.json> [previous-tier]
-  route.ts check <adapter-dir> <repo-root>`;
+  pr-attention-router evidence <paths-z-file> <numstat-file> <verify-conclusion> <base-sha> <head-sha>
+  pr-attention-router prompt <adapter-dir> <evidence.json> <pull-request.json> [repo-root]
+  pr-attention-router route <adapter-dir> <evidence.json> <ai-output-file> <pull-request.json> [previous-tier]
+  pr-attention-router check <adapter-dir> <repo-root>`;
 
 function readJson<T>(path: string): T {
   return JSON.parse(readText(path)) as T;
@@ -478,6 +484,7 @@ function main(args: readonly string[]): void {
           fileURLToPath(new URL('./classification-prompt.md', import.meta.url)),
         ),
         rubric,
+        engineeringContext: loadEngineeringContext(rubric, rest[3] ?? process.cwd()),
         evidence,
         floor: evaluateFloor(evidence, rules),
         title: pullRequest.title,
@@ -510,6 +517,7 @@ function main(args: readonly string[]): void {
 
   if (command === 'check') {
     const adapterDir = argument(rest, 0, 'adapter-dir');
+    loadEngineeringContext(readText(join(adapterDir, 'rubric.md')), argument(rest, 1, 'repo-root'));
     const trackedFiles = parsePaths(
       execFileSync('git', ['ls-files', '-z'], {
         cwd: argument(rest, 1, 'repo-root'),
@@ -535,6 +543,6 @@ function main(args: readonly string[]): void {
   throw new Error(usage);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main(process.argv.slice(2));
 }

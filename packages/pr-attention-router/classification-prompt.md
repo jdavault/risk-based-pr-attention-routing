@@ -31,5 +31,9 @@ Return only JSON that matches the output schema:
 - `summary`: one or two sentences on what the change does and why it lands at this tier.
 - `reasons`: concrete reasons tied to this diff and the rubric.
 - `reviewFocus`: what the human reviewer should check first.
+- `dimensions`: probability, impact, detectability and blastRadius, each with a
+  Low/Moderate/High level and a concrete detail from the diff and trusted docs.
+  High detectability means easier to detect, not greater risk. Do not invent data.
+- `missingEvidence`: explicit gaps, or an empty list if none were identified.
 
 Never say the change is approved, safe to merge, or needs no review.

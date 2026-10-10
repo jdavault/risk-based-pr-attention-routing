@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 env:
-  PAR_ROUTER: packages/pr-attention-router
+  PAR_ROUTER: ${{ runner.temp }}/par-tool/node_modules/@p3sg/pr-attention-router/dist
   PAR_ADAPTER: config/pr-attention-router
 
 # Runs queue rather than cancel, so a run is never stopped between finalizing a
@@ -77,6 +77,9 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '24'
+
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
 
       - name: Authorize pull request
         id: authorize
@@ -131,7 +134,7 @@ jobs:
           # --no-renames lists both sides of a move, so a protected old path still matches.
           git -C .par/target diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" > .par/paths.z
           git -C .par/target diff --numstat "$BASE_SHA...$HEAD_SHA" > .par/numstat.txt
-          node "$PAR_ROUTER/route.ts" evidence .par/paths.z .par/numstat.txt \
+          node "$PAR_ROUTER/route.js" evidence .par/paths.z .par/numstat.txt \
             "$VERIFY_CONCLUSION" "$BASE_SHA" "$HEAD_SHA" > .par/evidence.json
           if [ "$(wc -c < .par/evidence.json)" -gt 400000 ]; then
             echo '::error::Evidence exceeds the job-output limit.'
@@ -145,7 +148,7 @@ jobs:
           PULL_REQUEST_JSON: ${{ steps.authorize.outputs.pull-request }}
         run: |
           printf '%s' "$PULL_REQUEST_JSON" > .par/pull-request.json
-          node "$PAR_ROUTER/route.ts" route "$PAR_ADAPTER" .par/evidence.json /dev/null \
+          node "$PAR_ROUTER/route.js" route "$PAR_ADAPTER" .par/evidence.json /dev/null \
             .par/pull-request.json > .par/floor.json
           {
             echo '## Deterministic floor'
@@ -186,6 +189,9 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
+
       - name: Build the classification prompt
         env:
           EVIDENCE_JSON: ${{ needs.evidence.outputs.evidence }}
@@ -193,7 +199,7 @@ jobs:
         run: |
           printf '%s' "$EVIDENCE_JSON" > .par/evidence.json
           printf '%s' "$PULL_REQUEST_JSON" > .par/pull-request.json
-          node "$PAR_ROUTER/route.ts" prompt "$PAR_ADAPTER" .par/evidence.json \
+          node "$PAR_ROUTER/route.js" prompt "$PAR_ADAPTER" .par/evidence.json \
             .par/pull-request.json > .par/prompt.md
 
       # A Codex failure, a hang, or PAR_AI_ENABLED=false leaves the AI output
@@ -210,7 +216,7 @@ jobs:
           safety-strategy: read-only
           working-directory: .par/target
           prompt-file: ${{ github.workspace }}/.par/prompt.md
-          output-schema-file: ${{ github.workspace }}/${{ env.PAR_ROUTER }}/classification.schema.json
+          output-schema-file: ${{ env.PAR_ROUTER }}/classification.schema.json
 
   finalize:
     name: Finalize attention result
@@ -241,6 +247,9 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '24'
+
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
 
       - name: Read the existing attention comment
         id: existing
@@ -277,7 +286,7 @@ jobs:
           printf '%s' "$EVIDENCE_JSON" > .par/evidence.json
           printf '%s' "$PULL_REQUEST_JSON" > .par/pull-request.json
           printf '%s' "$AI_OUTPUT" > .par/ai.json
-          node "$PAR_ROUTER/route.ts" route "$PAR_ADAPTER" .par/evidence.json .par/ai.json \
+          node "$PAR_ROUTER/route.js" route "$PAR_ADAPTER" .par/evidence.json .par/ai.json \
             .par/pull-request.json "$PREVIOUS_TIER" > .par/result.json
           if [ "$(wc -c < .par/result.json)" -gt 400000 ]; then
             echo '::error::Finalized result exceeds the job-output limit.'
@@ -407,6 +416,9 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
+
       - name: Prepare bounded publication evidence
         env:
           RESULT_JSON: ${{ needs.finalize.outputs.result }}
@@ -415,7 +427,7 @@ jobs:
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
         run: |
           mkdir -p .par
-          node "$PAR_ROUTER/publish-record.ts"
+          node "$PAR_ROUTER/publish-record.js"
 
       - name: Retain publication provenance
         uses: actions/upload-artifact@v4

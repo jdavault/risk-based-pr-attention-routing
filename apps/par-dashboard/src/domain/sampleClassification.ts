@@ -3,7 +3,7 @@ import type {
   Floor,
   RouteResult,
   Rule,
-} from '@scope/pr-attention-router/route.ts';
+} from '@p3sg/pr-attention-router';
 
 import type { SamplePullRequest } from './attention';
 
@@ -87,7 +87,7 @@ export function toSampleClassification(
     notificationSummary: [
       `[${pullRequest.tier}] PR #${pullRequest.number}: ${pullRequest.title}`,
       `Reviewer: ${reviewerFor(pullRequest.tier)} · Floor: ${floor.tier}`,
-      `https://github.com/jdavault/risk-based-pr-attention-routing/pull/${pullRequest.number}`,
+      `https://github.com/p3sg/risk-based-pr-attention-routing/pull/${pullRequest.number}`,
     ].join('\n'),
     shouldNotify: true,
   };

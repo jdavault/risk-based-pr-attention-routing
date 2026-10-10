@@ -1,4 +1,4 @@
-import type { Tier } from '@scope/pr-attention-router/route.ts';
+import type { Tier } from '@p3sg/pr-attention-router';
 
 export type RiskTier = Tier;
 export type ReviewerType = 'NON_LEAD_DEVELOPER' | 'TECH_LEAD_OR_SME';
@@ -39,7 +39,7 @@ export const tierDefinitions: readonly TierDefinition[] = [
     label: 'Focused change',
     reviewer: 'Developer familiar with the affected area',
     guidance:
-      'Human review is required in V1; candidate for future agent-only approval.',
+      'Human review is required. Focus on the affected area.',
   },
   {
     tier: 'MEDIUM',

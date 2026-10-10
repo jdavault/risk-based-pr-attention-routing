@@ -3,8 +3,29 @@
   "title": "PR attention classification",
   "type": "object",
   "additionalProperties": false,
-  "required": ["tier", "summary", "reasons", "reviewFocus"],
+  "required": ["tier", "summary", "reasons", "reviewFocus", "dimensions", "missingEvidence"],
+  "$defs": {
+    "dimension": {
+      "type": "object", "additionalProperties": false,
+      "required": ["level", "detail"],
+      "properties": {
+        "level": { "type": "string", "enum": ["Low", "Moderate", "High"] },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    }
+  },
   "properties": {
+    "dimensions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["probability", "impact", "detectability", "blastRadius"],
+      "properties": {
+        "probability": { "$ref": "#/$defs/dimension" },
+        "impact": { "$ref": "#/$defs/dimension" },
+        "detectability": { "$ref": "#/$defs/dimension" },
+        "blastRadius": { "$ref": "#/$defs/dimension" }
+      }
+    },
+    "missingEvidence": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
     "tier": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
     "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
     "reasons": {

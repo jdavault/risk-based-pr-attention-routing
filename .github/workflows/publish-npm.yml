@@ -1,0 +1,56 @@
+name: Stage npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  stage:
+    name: Validate and stage package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Install staged-publishing npm CLI
+        run: npm install --global npm@11.21.0
+
+      - name: Verify release tag matches package version
+        run: |
+          EXPECTED_TAG="v$(node -p "require('./packages/pr-attention-router/package.json').version")"
+          if [[ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match package version $EXPECTED_TAG."
+            exit 1
+          fi
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Validate router package
+        run: npm run check:router
+
+      - name: Audit production dependency surface
+        run: npm audit --workspace @p3sg/pr-attention-router --omit=dev
+
+      - name: Audit complete package dependency surface
+        run: npm audit --workspace @p3sg/pr-attention-router
+
+      - name: Stage public package for human approval
+        working-directory: packages/pr-attention-router
+        run: npm stage publish --access public
