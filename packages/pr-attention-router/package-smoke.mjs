@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const packageDir = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = fileURLToPath(new URL('../../', import.meta.url));
 const expectedFiles = [
+  'LICENSE',
   'README.md',
   'dist/classification-prompt.md',
   'dist/classification.schema.json',
@@ -68,6 +69,30 @@ try {
   ), 'utf8'));
   const packageName = installedManifest.name;
   await check('scoped package name', () => assert.equal(packageName, '@p3sg/pr-attention-router'));
+  await check('v1 release metadata', () => {
+    assert.equal(installedManifest.version, '1.0.0');
+    assert.equal(installedManifest.license, 'Apache-2.0');
+    assert.equal(installedManifest.author, 'Joe Davault');
+    assert.deepEqual(installedManifest.repository, {
+      type: 'git',
+      url: 'git+https://github.com/p3sg/risk-based-pr-attention-routing.git',
+      directory: 'packages/pr-attention-router',
+    });
+    assert.equal(installedManifest.homepage,
+      'https://github.com/p3sg/risk-based-pr-attention-routing/tree/main/packages/pr-attention-router#readme');
+    assert.deepEqual(installedManifest.bugs,
+      { url: 'https://github.com/p3sg/risk-based-pr-attention-routing/issues' });
+    assert.deepEqual(installedManifest.keywords,
+      ['pull-request', 'code-review', 'risk-classification', 'automation', 'github-actions']);
+    assert.deepEqual(installedManifest.engines, { node: '>=24' });
+    assert.deepEqual(installedManifest.publishConfig, { access: 'public' });
+    assert.deepEqual(installedManifest.dependencies ?? {}, {});
+  });
+  await check('packaged Apache license', () => {
+    const license = readFileSync(join(consumerDir, 'node_modules', packed.name, 'LICENSE'), 'utf8');
+    assert.match(license, /Apache License\s+Version 2\.0, January 2004/u);
+    assert.match(license, /http:\/\/www\.apache\.org\/licenses\//u);
+  });
 
   const runtimeSource = `
     import { route } from ${JSON.stringify(packageName)};

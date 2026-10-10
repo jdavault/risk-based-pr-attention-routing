@@ -1,178 +1,66 @@
-# Install the PR Attention Router
+# Install the distributed router
 
-## Installation boundary
+`@p3sg/pr-attention-router` is the adopter-facing npm product. The P3 dashboard,
+API, Google OAuth and Netlify deployment are independent private demonstration
+infrastructure and are not required or included.
 
-The router classifies required human attention as `LOW`, `MEDIUM`, or `HIGH`,
-updates one persistent pull-request comment, and may send short email and Slack
-alerts when the tier first appears or changes. It never approves, merges,
-deploys, releases, or modifies pull-request source.
+## Release contract
 
-It is application-independent. React, React Native, NestJS, and Turborepo
-repositories use the same package and workflow; each writes its own rules and
-rubric.
+Version 1.0.0 requires Node 24, has no runtime dependencies and is licensed under
+Apache-2.0. The supported JavaScript/TypeScript imports are exactly:
 
-```text
-packages/pr-attention-router/       reusable package; copy unchanged
-config/pr-attention-router/
-  rules.json                        host path floors
-  rubric.md                         host tier definitions
-.github/workflows/
-  pr-attention-review.yml           evidence, classify, finalize, notify, publish
-  <host validation>.yml             normal application checks
+- `@p3sg/pr-attention-router`
+- `@p3sg/pr-attention-router/publication`
+
+Publication records are closed schemas. Unknown authority, analysis or risk-
+dimension fields are rejected instead of preserved. Internal modules and the
+workflow-only publication script are not public exports.
+
+The repository prepares a staged npm release; it does not imply that version
+1.0.0 is already public. Before approval, inspect the packed artifact with:
+
+```sh
+npm run package-smoke --workspace @p3sg/pr-attention-router
+npm pack --dry-run --json --ignore-scripts --workspace @p3sg/pr-attention-router
 ```
 
-The optional `apps/par-dashboard` is not installed by adopting repositories.
-In this reference repository it is a client of the package's public `route()`
-result types, not part of the workflow installation contract. It does not
-bundle the Node-only CLI into the browser.
+## Reference integration
 
-## Package-to-host contract
+1. Install the reviewed exact release rather than a moving tag:
 
-The package has no runtime dependencies or host paths. Node 22.18+ runs its
-TypeScript directly; CI uses Node 24. One file provides four subcommands:
+   ```sh
+   npm install --save-exact @p3sg/pr-attention-router@1.0.0
+   ```
 
-```text
-route.ts evidence <paths-z-file> <numstat-file> <validation-result> <base-sha> <head-sha>
-route.ts prompt <adapter-dir> <evidence.json> <pull-request.json>
-route.ts route <adapter-dir> <evidence.json> <ai-output-file> <pull-request.json> [previous-tier]
-route.ts check <adapter-dir> <repo-root>
-```
+2. Copy `node_modules/@p3sg/pr-attention-router/dist/examples/config/` to
+   `config/pr-attention-router/` and the packaged workflow reference to
+   `.github/workflows/pr-attention-review.yml`. Customize real repository paths,
+   rubric semantics and verification-workflow names before enabling it.
 
-`rules.json` answers **where did the change occur?** It contains only known
-existing paths whose minimum tier can be guaranteed from location. Rules may
-be `MEDIUM` or `HIGH`, never `LOW`.
+3. Validate the host policy against tracked files:
 
-`rubric.md` answers **what does the change actually do?** It is the single
-source for the semantic definition of every tier. It has exact `## LOW`,
-`## MEDIUM`, and `## HIGH` headings, each with a definition, examples, blast
-radius, and review focus.
+   ```sh
+   npx --no-install pr-attention-router check config/pr-attention-router .
+   ```
 
-Every rule agrees with the rubric, but not every rubric example needs a rule.
-A shared UI path can establish MEDIUM while Codex raises a new analytics
-destination in that path to HIGH based on behavior.
+4. Preserve trusted default-branch checkouts, same-repository author/head checks,
+   read-only pull-request inspection, least-privilege jobs and isolated
+   notification credentials. Never execute pull-request code in a credentialed
+   job.
 
-## Write the host adapter
+5. Configure repository variable `PAR_APP_WORKFLOWS_ENABLED=true`. AI requires
+   the workflow's `OPENAI_API_KEY`; deterministic-only fallback must require human
+   review. Email and Slack remain optional and isolated from classification.
 
-Inspect the repository before writing policy:
+6. Human-review and merge the integration, then exercise authorized LOW, MEDIUM
+   and HIGH sandbox pull requests. Compare the deterministic floor, AI result,
+   final tier, comment and `classification.json` artifact. Do not infer approval
+   or merge authority from a tier.
 
-1. Find money, authentication/authorization, credentials, deployment,
-   data-loss/migration, search-indexability, and CI/automation surfaces that
-   actually exist. These are HIGH-rule candidates.
-2. Find app shells, routing, shared UI, shared libraries/API clients,
-   build/dependency configuration, and operational runbooks that actually
-   exist. These are MEDIUM-rule candidates.
-3. Put localized, visible, easily reversible changes in LOW rubric examples;
-   do not create LOW path rules.
-4. Put semantic risks paths cannot identify—such as a new external data
-   destination or credential handling—in the rubric.
-5. Explain each rule with a concrete failure: “If X breaks unnoticed, Y
-   happens.”
-6. Validate every individual glob against tracked files.
+The packaged workflow is a copyable reference, not a composite action or hosted
+service. It installs the router into a trusted temporary directory with lifecycle
+scripts disabled. Other adopters may consume the module/result contract without
+the private P3 dashboard.
 
-Do not copy another repository's policy because its folder names look similar.
-A frontend may need indexing and third-party-script examples. A NestJS backend
-may need authorization, migration, queue, and external API rules. A mobile app
-may need permissions, deep links, native configuration, release signing, and
-data-storage examples. Add only capabilities the host has.
-
-```bash
-node packages/pr-attention-router/route.ts check config/pr-attention-router .
-```
-
-The check rejects malformed JSON, LOW rules, missing fields, empty path lists,
-duplicate IDs, stale individual globs, and missing headings. Dotfile globs must
-state the dot: `.github/**`, never `github/**`.
-
-## Coded guarantees and Codex judgment
-
-Code establishes a minimum tier for only three things:
-
-1. A changed path matching `rules.json`.
-2. Required validation that did not succeed: MEDIUM.
-3. At least 250 changed lines: MEDIUM.
-
-Codex receives the generic process, PR diff range and description, host
-rubric, and floor. It may raise the floor, never lower it. Missing or
-contradictory context and deleted or weakened tests are evidence for Codex,
-not separate coded signals. Invalid AI output publishes the floor. Authority
-language preserves a valid AI tier but withholds all AI prose.
-
-## Workflow trust boundary
-
-Listen to the exact top-level name of required host validation:
-
-```yaml
-on:
-  workflow_run:
-    workflows: [Validate repository]
-    types: [completed]
-
-env:
-  PAR_ROUTER: packages/pr-attention-router
-  PAR_ADAPTER: config/pr-attention-router
-```
-
-Preserve these properties:
-
-- accept `success`, `failure`, and `timed_out`;
-- load trusted router/config at `ref: ${{ github.sha }}`;
-- check the validated PR head out separately under `.par/target`;
-- require a same-repository, human-authored PR from a writer;
-- require current and validated head SHAs to match;
-- never execute or install PR code in the attention workflow;
-- run Codex read-only with repository-read permissions only;
-- expose the OpenAI key only to classify;
-- expose `issues: write` and `pull-requests: write` only to Publish, because
-  this repository's PR-comment endpoint requires both, and expose the Slack
-  token only to Notify Slack;
-- use `cancel-in-progress: false` so cancellation cannot strand an alert.
-
-Because `workflow_run` loads from the default branch, exercise a changed
-attention workflow with an acceptance PR after it lands.
-
-## Variables and secrets
-
-| Kind | Name | Purpose |
-| --- | --- | --- |
-| Variable | `PAR_APP_WORKFLOWS_ENABLED` | Exactly `true` enables routing. |
-| Variable | `PAR_AI_ENABLED` | Exactly `false` skips Codex; otherwise enabled. |
-| Variable | `PAR_EMAIL_ENABLED` | Exactly `true` enables email. |
-| Variable | `PAR_EMAIL_FROM` | SMTP sender address. |
-| Variable | `PAR_EMAIL_TO_TEAM` | LOW/MEDIUM recipients, comma-delimited. |
-| Variable | `PAR_EMAIL_TO_LEAD` | HIGH recipients, comma-delimited. |
-| Variable | `SMTP_HOST` | Runner-reachable unauthenticated SMTP host. |
-| Variable | `SMTP_PORT` | Required SMTP port, normally `25` or the ngrok TCP port. |
-| Variable | `PAR_SLACK_ENABLED` | Exactly `true` enables Slack. |
-| Variable | `PAR_SLACK_CHANNEL_ID` | Destination channel containing the bot. |
-| Secret | `OPENAI_API_KEY` | Read-only classify job only. |
-| Secret | `SLACK_BOT_TOKEN` | Notify Slack job only; requires `chat:write`. |
-
-The PR comment is canonical. Email and Slack receive only tier/title,
-reviewer/floor, and URL. Plain unauthenticated SMTP uses Python's
-standard-library `smtplib` in the Notify email job, adding no router dependency. HIGH routes
-to the lead list; LOW/MEDIUM route to the team list. Both transports are
-best-effort and cannot change classification.
-
-If email later requires authentication, TLS policy, templates, attachments,
-retries, or shared application behavior, replace the workflow snippet with an
-approved Node adapter such as Nodemailer. Do not grow `smtplib` into an
-application mail system.
-
-## Host CI and acceptance
-
-Required validation should run:
-
-```bash
-npm ci --ignore-scripts
-npm run typecheck --workspace @scope/pr-attention-router
-npm test --workspace @scope/pr-attention-router
-node packages/pr-attention-router/route.ts check config/pr-attention-router .
-```
-
-Then run normal host lint, types, tests, build, and integration checks. The
-package must test without installing the application.
-
-After landing, use throwaway LOW, deterministic MEDIUM, deterministic HIGH,
-semantic-raise, and AI-off PRs. Verify the floor, final tier, reviewer, one
-persistent comment, thin email and Slack alerts, and no repeated same-tier
-alert; close the probes without merging.
+Before installing outside the ADR-0001 sandbox boundary, obtain owner approval and
+amend or supersede that decision record.

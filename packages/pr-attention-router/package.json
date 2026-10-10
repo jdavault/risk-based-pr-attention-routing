@@ -1,8 +1,16 @@
 {
   "name": "@p3sg/pr-attention-router",
-  "version": "0.2.0",
-  "license": "UNLICENSED",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
   "description": "Classification-only PR attention router: coded floors plus a host rubric applied by AI.",
+  "keywords": [
+    "pull-request",
+    "code-review",
+    "risk-classification",
+    "automation",
+    "github-actions"
+  ],
+  "author": "Joe Davault",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/p3sg/risk-based-pr-attention-routing.git",
@@ -14,6 +22,7 @@
   },
   "type": "module",
   "files": [
+    "LICENSE",
     "README.md",
     "dist/route.js",
     "dist/route.d.ts",
@@ -39,6 +48,9 @@
   "bin": { "pr-attention-router": "./dist/route.js" },
   "engines": {
     "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "node clean.mjs && tsc -p tsconfig.build.json && node build.mjs",

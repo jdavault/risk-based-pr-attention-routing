@@ -4,7 +4,7 @@
 
 ## Goal
 
-Release `pr-attention-router` 1.0.0 as a public Apache-2.0 npm package with a
+Release `@p3sg/pr-attention-router` 1.0.0 as a public Apache-2.0 npm package with a
 small explicit API, reproducible package contents, consumer-level validation,
 and token-free staged publication with npm provenance.
 
@@ -16,27 +16,26 @@ Netlify configuration, repository policy and credentials are not package
 dependencies and must never enter the tarball. Host repositories continue to
 own their rubric, path rules and engineering context.
 
-The package name is the currently available unscoped name
-`pr-attention-router`. Registry and provenance metadata use the repository's
-real identity:
+The package uses the organization-owned npm scope
+`@p3sg/pr-attention-router`. Registry and provenance metadata use the
+repository's matching identity:
 
 - author: Joe Davault
-- repository: `https://github.com/jdavault/risk-based-pr-attention-routing`
+- repository: `https://github.com/p3sg/risk-based-pr-attention-routing`
 - package directory: `packages/pr-attention-router`
 - issues: the repository's GitHub Issues page
 - homepage: the package directory on the repository's default branch
 
-If the repository later moves to an organization, repository metadata and the
-npm trusted-publisher binding change together.
+The repository and npm trusted-publisher binding use the same `p3sg` owner.
 
 ## Public contract
 
 The supported JavaScript/TypeScript entry points are exactly:
 
-- `pr-attention-router`
-- `pr-attention-router/publication`
+- `@p3sg/pr-attention-router`
+- `@p3sg/pr-attention-router/publication`
 
-The supported executable is `pr-attention-router`. Prompt/schema files and
+The supported executable remains `pr-attention-router`. Prompt/schema files and
 copyable integration examples are packaged assets. `publish-record.js` remains
 a workflow-only executable artifact required by the example workflow; it is
 not importable through a package export. No wildcard subpath export is allowed.
@@ -86,7 +85,7 @@ and invokes `npm stage publish` from the package directory.
 
 The npm trusted publisher is bound to:
 
-- GitHub owner: `jdavault`
+- GitHub owner: `p3sg`
 - repository: `risk-based-pr-attention-routing`
 - workflow filename: `publish-npm.yml`
 - stage-publish permission only
