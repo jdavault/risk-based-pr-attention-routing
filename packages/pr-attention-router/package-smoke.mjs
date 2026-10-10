@@ -93,6 +93,26 @@ try {
     assert.match(license, /Apache License\s+Version 2\.0, January 2004/u);
     assert.match(license, /http:\/\/www\.apache\.org\/licenses\//u);
   });
+  await check('token-free staged release workflow', () => {
+    const workflow = readFileSync(join(repositoryRoot, '.github', 'workflows', 'publish-npm.yml'), 'utf8');
+    assert.match(workflow, /release:\s*\n\s+types:\s*\[published\]/u);
+    assert.match(workflow, /permissions:\s*\n\s+contents:\s*read\s*\n\s+id-token:\s*write/u);
+    assert.match(workflow, /runs-on:\s*ubuntu-24\.04/u);
+    assert.doesNotMatch(workflow, /self-hosted|NODE_AUTH_TOKEN|secrets\./u);
+    assert.match(workflow, /persist-credentials:\s*false/u);
+    assert.match(workflow, /node-version:\s*['"]24['"]/u);
+    assert.match(workflow, /registry-url:\s*['"]https:\/\/registry\.npmjs\.org['"]/u);
+    assert.match(workflow, /package-manager-cache:\s*false/u);
+    assert.match(workflow, /npm install --global npm@11\.21\.0/u);
+    assert.match(workflow, /EXPECTED_TAG=.*packages\/pr-attention-router\/package\.json/u);
+    assert.match(workflow, /GITHUB_REF_NAME.*EXPECTED_TAG/u);
+    assert.match(workflow, /npm ci --ignore-scripts/u);
+    assert.match(workflow, /npm run check:router/u);
+    assert.match(workflow, /npm audit --workspace @p3sg\/pr-attention-router --omit=dev/u);
+    assert.match(workflow, /npm audit --workspace @p3sg\/pr-attention-router/u);
+    assert.match(workflow, /working-directory:\s*packages\/pr-attention-router\s*\n\s+run:\s*npm stage publish --access public/u);
+    assert.doesNotMatch(workflow, /(^|\s)npm publish(?:\s|$)/mu);
+  });
 
   const runtimeSource = `
     import { route } from ${JSON.stringify(packageName)};

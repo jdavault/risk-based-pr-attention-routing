@@ -64,3 +64,34 @@ the private P3 dashboard.
 
 Before installing outside the ADR-0001 sandbox boundary, obtain owner approval and
 amend or supersede that decision record.
+
+## Staged publishing and trusted publisher
+
+The release workflow uses npm OIDC rather than a stored npm token. Configure the
+package's GitHub Actions trusted publisher with these exact values only after the
+workflow exists on the default branch:
+
+- GitHub organization or user: `p3sg`
+- Repository: `risk-based-pr-attention-routing`
+- Workflow filename: `publish-npm.yml`
+- Environment: none
+- Allowed action: `npm stage publish` only
+- Direct `npm publish` and dist-tag management: disabled
+
+The package must already exist on npm before a trusted-publisher relationship can
+be created. Treat creation of that first registry package as a separately
+authorized bootstrap operation; do not introduce a CI token to bypass this npm
+constraint. Create the trust relationship only when a release is ready because
+npm requires its first successful OIDC publish within two days.
+
+Publish a GitHub release whose tag is exactly `v<package version>`. The workflow
+validates the tag, runs the complete router/package gate and submits the package to
+npm staging. Inspect the staged manifest and tarball, then approve it interactively
+with npm 2FA. Committing or running the validation workflow alone does not publish
+the package.
+
+After the first successful OIDC stage, set npm Publishing access to **Require
+two-factor authentication and disallow tokens**. Trusted publishing continues to
+work because it uses short-lived OIDC credentials. See npm's
+[trusted-publisher](https://docs.npmjs.com/trusted-publishers/) and
+[staged-publishing](https://docs.npmjs.com/staged-publishing/) documentation.
