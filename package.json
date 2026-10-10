@@ -10,7 +10,7 @@
     "build": "npm run build --workspace @p3sg/pr-attention-router && npm run build --workspace par-api && npm run build --workspace par-dashboard",
     "check": "npm run check:router && npm run check:api && npm run check:dashboard",
     "check:attention-config": "node packages/pr-attention-router/route.ts check config/pr-attention-router .",
-    "check:router": "npm run typecheck --workspace @p3sg/pr-attention-router && npm test --workspace @p3sg/pr-attention-router && npm run build --workspace @p3sg/pr-attention-router && npm run check:attention-config",
+    "check:router": "npm run typecheck --workspace @p3sg/pr-attention-router && npm test --workspace @p3sg/pr-attention-router && npm run build --workspace @p3sg/pr-attention-router && npm run package-smoke --workspace @p3sg/pr-attention-router && npm run check:attention-config",
     "check:api": "npm run typecheck --workspace par-api && npm test --workspace par-api",
     "check:dashboard": "npm run lint --workspace par-dashboard && npm run typecheck --workspace par-dashboard && npm test --workspace par-dashboard && npm run build --workspace par-dashboard"
   }
