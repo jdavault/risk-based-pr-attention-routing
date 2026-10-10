@@ -36,3 +36,35 @@ test('withheld AI prose is not leaked into machine-readable evidence', () => {
   assert.equal(record.aiTextWithheld, true);
   assert.equal(JSON.stringify(record).includes('safe to merge'), false);
 });
+
+test('rejects undeclared publication authority fields', () => {
+  const record = createPublication(input);
+  assert.equal(parsePublication({ ...record, mergeAuthority: 'agent' }), null);
+});
+
+test('rejects undeclared analysis fields', () => {
+  const record = createPublication(input);
+  assert.ok(record.analysis);
+  assert.equal(parsePublication({ ...record, analysis: { ...record.analysis, confidence: 1 } }), null);
+});
+
+const dimensions = {
+  probability: { level: 'Low', detail: 'A narrow change is unlikely to fail.' },
+  impact: { level: 'Moderate', detail: 'A failure could delay a review.' },
+  detectability: { level: 'High', detail: 'Validation should expose a failure.' },
+  blastRadius: { level: 'Low', detail: 'Only this pull request is affected.' },
+} as const;
+
+test('rejects undeclared risk dimensions', () => {
+  const record = createPublication(input);
+  assert.ok(record.analysis);
+  assert.equal(parsePublication({ ...record, analysis: { ...record.analysis,
+    dimensions: { ...dimensions, privacy: { level: 'High', detail: 'Unexpected authority surface.' } } } }), null);
+});
+
+test('rejects undeclared fields inside a risk dimension', () => {
+  const record = createPublication(input);
+  assert.ok(record.analysis);
+  assert.equal(parsePublication({ ...record, analysis: { ...record.analysis,
+    dimensions: { ...dimensions, probability: { ...dimensions.probability, score: 1 } } } }), null);
+});

@@ -23,15 +23,25 @@ const text = (v: unknown): v is string => typeof v === 'string' && v.trim().leng
 const texts = (v: unknown): v is string[] => Array.isArray(v) && v.length <= 24 && v.every(text);
 const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const positive = (v: unknown) => Number.isSafeInteger(v) && Number(v) > 0;
+const publicationKeys = ['version', 'repository', 'pullRequest', 'headSha', 'baseSha', 'policySha',
+  'runId', 'runAttempt', 'createdAt', 'changedLines', 'validationPassed', 'deterministicFloor',
+  'floorReasons', 'finalTier', 'reviewer', 'aiUsed', 'aiTextWithheld', 'analysis'] as const;
+const analysisKeys = ['summary', 'reasons', 'reviewFocus', 'dimensions', 'missingEvidence'] as const;
+const dimensionNames = ['probability', 'impact', 'detectability', 'blastRadius'] as const;
+const dimensionKeys = ['level', 'detail'] as const;
+const exactKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
+  Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 
 function validDimensions(value: unknown): value is NonNullable<Analysis['dimensions']> {
-  return object(value) && ['probability', 'impact', 'detectability', 'blastRadius'].every((key) => {
+  return object(value) && exactKeys(value, dimensionNames) && dimensionNames.every((key) => {
     const d = value[key];
-    return object(d) && ['Low', 'Moderate', 'High'].includes(String(d.level)) && text(d.detail);
+    return object(d) && exactKeys(d, dimensionKeys) &&
+      ['Low', 'Moderate', 'High'].includes(String(d.level)) && text(d.detail);
   });
 }
 function validAnalysis(value: unknown): value is Analysis {
-  return object(value) && text(value.summary) && texts(value.reasons) && value.reasons.length > 0 &&
+  return object(value) && exactKeys(value, analysisKeys) &&
+    text(value.summary) && texts(value.reasons) && value.reasons.length > 0 &&
     texts(value.reviewFocus) && value.reviewFocus.length > 0 &&
     (value.dimensions === null || validDimensions(value.dimensions)) &&
     (value.missingEvidence === null || texts(value.missingEvidence));
@@ -42,7 +52,8 @@ function authorityInAnalysis(analysis: Analysis): boolean {
       ...Object.values(analysis.dimensions ?? {}).map((d) => d.detail)], reviewFocus: analysis.reviewFocus });
 }
 export function parsePublication(value: unknown): Publication | null {
-  if (!object(value) || JSON.stringify(value).length > publicationLimit || value.version !== 1 ||
+  if (!object(value) || !exactKeys(value, publicationKeys) ||
+    JSON.stringify(value).length > publicationLimit || value.version !== 1 ||
     typeof value.repository !== 'string' || !repositoryPattern.test(value.repository) ||
     value.repository.split('/').some((p) => p === '.' || p === '..') ||
     !positive(value.pullRequest) || !positive(value.runId) || !positive(value.runAttempt) ||
