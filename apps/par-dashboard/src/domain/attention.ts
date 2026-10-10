@@ -1,6 +1,30 @@
 import type { Tier } from '@p3sg/pr-attention-router';
 
 export type RiskTier = Tier;
+export type ReviewerType = 'NON_LEAD_DEVELOPER' | 'TECH_LEAD_OR_SME';
+
+export interface RiskDimension {
+  readonly level: 'Low' | 'Moderate' | 'High';
+  readonly detail: string;
+}
+
+export interface SamplePullRequest {
+  readonly id: string;
+  readonly number: number;
+  readonly title: string;
+  readonly repository: string;
+  readonly tier: RiskTier;
+  readonly reviewerType: ReviewerType;
+  readonly reviewerLabel: string;
+  readonly summary: string;
+  readonly evidence: readonly string[];
+  readonly probability: RiskDimension;
+  readonly impact: RiskDimension;
+  readonly detectability: RiskDimension;
+  readonly blastRadius: RiskDimension;
+  readonly reviewFocus: string;
+  readonly missingEvidence: readonly string[];
+}
 
 export interface TierDefinition {
   readonly tier: RiskTier;

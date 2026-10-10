@@ -93,6 +93,25 @@ try {
     assert.match(license, /Apache License\s+Version 2\.0, January 2004/u);
     assert.match(license, /http:\/\/www\.apache\.org\/licenses\//u);
   });
+  await check('packaged workflow uses the scoped package', () => {
+    const workflow = readFileSync(join(
+      consumerDir,
+      'node_modules',
+      packed.name,
+      'dist',
+      'examples',
+      'github-action',
+      'pr-attention-review.yml',
+    ), 'utf8');
+    assert.match(workflow,
+      /node_modules\/@p3sg\/pr-attention-router\/dist/u);
+    assert.match(workflow,
+      /npm install[^\n]+@p3sg\/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION/gu);
+    assert.doesNotMatch(workflow,
+      /node_modules\/pr-attention-router|\spr-attention-router@REPLACE_WITH_REVIEWED_VERSION/gu);
+    assert.match(workflow,
+      /output-schema-file:\s*\$\{\{ env\.PAR_ROUTER \}\}\/classification\.schema\.json/u);
+  });
   await check('token-free staged release workflow', () => {
     const workflow = readFileSync(join(repositoryRoot, '.github', 'workflows', 'publish-npm.yml'), 'utf8');
     assert.match(workflow, /release:\s*\n\s+types:\s*\[published\]/u);

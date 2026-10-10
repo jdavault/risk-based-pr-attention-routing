@@ -1,0 +1,6 @@
+{
+  "rules": [
+    { "id": "workflow", "tier": "HIGH", "paths": [".github/workflows/**"], "why": "Workflow changes can alter credential isolation and validation." },
+    { "id": "policy", "tier": "HIGH", "paths": ["config/pr-attention-router/**"], "why": "Policy changes affect every classification." }
+  ]
+}

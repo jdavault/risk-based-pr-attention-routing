@@ -1,0 +1,489 @@
+# Classification-only PR attention router. Code sets a floor from path rules,
+# failing CI, and change size; Codex applies the repository rubric and may
+# raise it; the higher tier wins. It never approves, merges, deploys, or
+# changes PR source. Its only writes are one PR comment and a short Slack and
+# email alert. See docs/runbooks/pr-attention-notification.md.
+#
+# The router package stays lean (route.ts); this workflow splits the run into
+# explicit jobs so each stage and each notification outcome is visible in the
+# Actions graph:
+#
+#   Collect trusted evidence -> Classify with Codex -> Finalize attention result
+#     -> Publish attention result -> Notify email + Notify Slack
+#
+# Trust model: workflow_run always loads this file from the default branch,
+# and every job that needs code checks the router and host config out at
+# github.sha. Only Collect and Classify check out the PR head (under
+# .par/target), and only read it. Each job holds only the permission or secret
+# its stage needs.
+name: PR Attention Review
+
+on:
+  workflow_run:
+    workflows: [Validate repository]
+    types: [completed]
+
+permissions:
+  contents: read
+
+env:
+  PAR_ROUTER: ${{ runner.temp }}/par-tool/node_modules/@p3sg/pr-attention-router/dist
+  PAR_ADAPTER: config/pr-attention-router
+
+# Runs queue rather than cancel, so a run is never stopped between finalizing a
+# result and sending or publishing it.
+concurrency:
+  group: attention-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    name: Collect trusted evidence
+    # Same-repository PRs only. Fork PRs never reach a job that holds secrets.
+    if: >
+      vars.PAR_APP_WORKFLOWS_ENABLED == 'true' &&
+      (github.event.workflow_run.conclusion == 'success' ||
+        github.event.workflow_run.conclusion == 'failure' ||
+        github.event.workflow_run.conclusion == 'timed_out') &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0].number != null
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      evidence: ${{ steps.evidence.outputs.json }}
+      pull-request: ${{ steps.authorize.outputs.pull-request }}
+
+    steps:
+      - name: Check out trusted router and rules from the default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pull request for inspection
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: .par/target
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
+
+      - name: Authorize pull request
+        id: authorize
+        uses: actions/github-script@v8
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          VALIDATED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        with:
+          script: |
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const { data: pullRequest } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: Number(process.env.PAR_PR_NUMBER),
+            });
+
+            if (pullRequest.head.repo?.full_name !== repository) {
+              throw new Error('Only same-repository pull requests are classified.');
+            }
+            if (pullRequest.user.type !== 'User') {
+              throw new Error('Only human-authored pull requests are classified.');
+            }
+            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+              ...context.repo,
+              username: pullRequest.user.login,
+            });
+            if (!['admin', 'maintain', 'write'].includes(permission.role_name)) {
+              throw new Error('The pull request author lacks write access to this repository.');
+            }
+            if (
+              pullRequest.head.sha !== process.env.EXPECTED_HEAD_SHA ||
+              pullRequest.head.sha !== process.env.VALIDATED_HEAD_SHA
+            ) {
+              throw new Error('The pull request changed after validation; wait for the next run.');
+            }
+
+            // Bounded: GitHub caps a PR body at 65,536 characters.
+            core.setOutput('pull-request', JSON.stringify({
+              number: pullRequest.number,
+              title: pullRequest.title,
+              url: pullRequest.html_url,
+              body: pullRequest.body ?? '',
+            }));
+
+      - name: Collect changed paths, size, and validation result
+        id: evidence
+        env:
+          BASE_SHA: ${{ github.event.workflow_run.pull_requests[0].base.sha }}
+          HEAD_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          VERIFY_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          # --no-renames lists both sides of a move, so a protected old path still matches.
+          git -C .par/target diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" > .par/paths.z
+          git -C .par/target diff --numstat "$BASE_SHA...$HEAD_SHA" > .par/numstat.txt
+          node "$PAR_ROUTER/route.js" evidence .par/paths.z .par/numstat.txt \
+            "$VERIFY_CONCLUSION" "$BASE_SHA" "$HEAD_SHA" > .par/evidence.json
+          if [ "$(wc -c < .par/evidence.json)" -gt 400000 ]; then
+            echo '::error::Evidence exceeds the job-output limit.'
+            exit 1
+          fi
+          echo "json=$(cat .par/evidence.json)" >> "$GITHUB_OUTPUT"
+
+      # The floor comes from the same route command Finalize uses, run with no AI output.
+      - name: Summarize the deterministic floor
+        env:
+          PULL_REQUEST_JSON: ${{ steps.authorize.outputs.pull-request }}
+        run: |
+          printf '%s' "$PULL_REQUEST_JSON" > .par/pull-request.json
+          node "$PAR_ROUTER/route.js" route "$PAR_ADAPTER" .par/evidence.json /dev/null \
+            .par/pull-request.json > .par/floor.json
+          {
+            echo '## Deterministic floor'
+            echo
+            jq -r '"**Floor:** \(.deterministicFloor)"' .par/floor.json
+            echo
+            jq -r 'if (.floorReasons | length) == 0 then "- No deterministic signals." else (.floorReasons[] | "- \(.)") end' .par/floor.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  classify:
+    name: Classify with Codex
+    needs: evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      ai: ${{ steps.codex.outputs.final-message }}
+
+    steps:
+      - name: Check out trusted router and rules from the default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out pull request for inspection
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: .par/target
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
+
+      - name: Build the classification prompt
+        env:
+          EVIDENCE_JSON: ${{ needs.evidence.outputs.evidence }}
+          PULL_REQUEST_JSON: ${{ needs.evidence.outputs.pull-request }}
+        run: |
+          printf '%s' "$EVIDENCE_JSON" > .par/evidence.json
+          printf '%s' "$PULL_REQUEST_JSON" > .par/pull-request.json
+          node "$PAR_ROUTER/route.js" prompt "$PAR_ADAPTER" .par/evidence.json \
+            .par/pull-request.json > .par/prompt.md
+
+      # A Codex failure, a hang, or PAR_AI_ENABLED=false leaves the AI output
+      # empty and Finalize falls back to the deterministic floor.
+      - name: Classify with Codex (read-only)
+        id: codex
+        if: vars.PAR_AI_ENABLED != 'false'
+        continue-on-error: true
+        # Under the job's 20 minutes, so a hung Codex still leaves this job green.
+        timeout-minutes: 12
+        uses: openai/codex-action@v1.8
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          safety-strategy: read-only
+          working-directory: .par/target
+          prompt-file: ${{ github.workspace }}/.par/prompt.md
+          output-schema-file: ${{ env.PAR_ROUTER }}/classification.schema.json
+
+  finalize:
+    name: Finalize attention result
+    needs: [evidence, classify]
+    # Runs even if Classify failed outright, so the floor is still published.
+    if: always() && needs.evidence.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      result: ${{ steps.route.outputs.result }}
+      should-notify: ${{ steps.route.outputs.should-notify }}
+      final-tier: ${{ steps.route.outputs.final-tier }}
+      comment-id: ${{ steps.existing.outputs.comment-id }}
+
+    steps:
+      - name: Check out trusted router and rules from the default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
+
+      - name: Read the existing attention comment
+        id: existing
+        uses: actions/github-script@v8
+        env:
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        with:
+          script: |
+            const marker = /<!--\s*par:v1 tier=(LOW|MEDIUM|HIGH)\s*-->/u;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: Number(process.env.PAR_PR_NUMBER),
+              per_page: 100,
+            });
+            // Only this workflow's own comment counts, so a pasted marker cannot suppress alerts.
+            const existing = comments.find(
+              (comment) =>
+                comment.user?.type === 'Bot' &&
+                comment.user.login === 'github-actions[bot]' &&
+                marker.test(comment.body ?? ''),
+            );
+            core.setOutput('comment-id', existing ? String(existing.id) : '');
+            core.setOutput('previous-tier', existing ? marker.exec(existing.body)[1] : '');
+
+      - name: Calculate the final tier
+        id: route
+        env:
+          EVIDENCE_JSON: ${{ needs.evidence.outputs.evidence }}
+          PULL_REQUEST_JSON: ${{ needs.evidence.outputs.pull-request }}
+          AI_OUTPUT: ${{ needs.classify.outputs.ai }}
+          PREVIOUS_TIER: ${{ steps.existing.outputs.previous-tier }}
+        run: |
+          mkdir -p .par
+          printf '%s' "$EVIDENCE_JSON" > .par/evidence.json
+          printf '%s' "$PULL_REQUEST_JSON" > .par/pull-request.json
+          printf '%s' "$AI_OUTPUT" > .par/ai.json
+          node "$PAR_ROUTER/route.js" route "$PAR_ADAPTER" .par/evidence.json .par/ai.json \
+            .par/pull-request.json "$PREVIOUS_TIER" > .par/result.json
+          if [ "$(wc -c < .par/result.json)" -gt 400000 ]; then
+            echo '::error::Finalized result exceeds the job-output limit.'
+            exit 1
+          fi
+          {
+            echo "result=$(jq -c . .par/result.json)"
+            echo "should-notify=$(jq -r .shouldNotify .par/result.json)"
+            echo "final-tier=$(jq -r .finalTier .par/result.json)"
+          } >> "$GITHUB_OUTPUT"
+          jq -r '
+            "## Attention result",
+            "",
+            "- **Final tier:** \(.finalTier)",
+            "- **Deterministic floor:** \(.deterministicFloor)",
+            "- **Reviewer:** \(.reviewer)",
+            "- **AI used:** \(.aiUsed)",
+            "- **AI text withheld:** \(.aiTextWithheld)",
+            "- **Notify:** \(if .shouldNotify then "yes (first result or tier change)" else "no (tier unchanged)" end)"
+          ' .par/result.json >> "$GITHUB_STEP_SUMMARY"
+
+  notify-email:
+    name: Notify email
+    needs: [finalize, publish]
+    if: needs.finalize.outputs.should-notify == 'true' && vars.PAR_EMAIL_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+
+    steps:
+      # HIGH goes to the lead list, LOW and MEDIUM to the team list. Python's
+      # smtplib keeps the router package dependency-free. Failure fails this job
+      # only; Publish still runs. Addresses and the SMTP host are never printed.
+      - name: Send the email alert
+        env:
+          RESULT_JSON: ${{ needs.finalize.outputs.result }}
+          SMTP_HOST: ${{ vars.SMTP_HOST }}
+          SMTP_PORT: ${{ vars.SMTP_PORT }}
+          PAR_EMAIL_FROM: ${{ vars.PAR_EMAIL_FROM }}
+          PAR_EMAIL_TO_TEAM: ${{ vars.PAR_EMAIL_TO_TEAM }}
+          PAR_EMAIL_TO_LEAD: ${{ vars.PAR_EMAIL_TO_LEAD }}
+        shell: python
+        run: |
+          import json, os, smtplib
+          from email.message import EmailMessage
+
+          def summarize(line):
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+                  summary.write(f'## Email\n\n{line}\n')
+
+          result = json.loads(os.environ['RESULT_JSON'])
+          audience = 'lead' if result['finalTier'] == 'HIGH' else 'team'
+          variable = 'PAR_EMAIL_TO_LEAD' if audience == 'lead' else 'PAR_EMAIL_TO_TEAM'
+          recipients = [address.strip() for address in os.environ[variable].split(',') if address.strip()]
+
+          try:
+              if not recipients:
+                  raise RuntimeError(f'{variable} has no recipients.')
+              summary_text = result['notificationSummary']
+              message = EmailMessage()
+              message['From'] = os.environ['PAR_EMAIL_FROM']
+              message['To'] = ', '.join(recipients)
+              message['Subject'] = summary_text.split('\n', 1)[0]
+              message.set_content(summary_text + '\n')
+              with smtplib.SMTP(os.environ['SMTP_HOST'], int(os.environ['SMTP_PORT']), timeout=30) as smtp:
+                  smtp.send_message(message)
+          except Exception as error:
+              summarize(f'Failed: {type(error).__name__}.')
+              raise SystemExit(f'Email alert failed: {type(error).__name__}.')
+
+          summarize(f'Sent to {audience} ({len(recipients)} recipient(s)) for {result["finalTier"]}.')
+          print(f'Emailed {audience} list for {result["finalTier"]}.')
+
+  notify-slack:
+    name: Notify Slack
+    needs: [finalize, publish]
+    if: needs.finalize.outputs.should-notify == 'true' && vars.PAR_SLACK_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+
+    steps:
+      # Failure fails this job only; Publish still runs. The token and channel
+      # ID are never printed.
+      - name: Send the Slack alert
+        env:
+          RESULT_JSON: ${{ needs.finalize.outputs.result }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          PAR_SLACK_CHANNEL_ID: ${{ vars.PAR_SLACK_CHANNEL_ID }}
+        run: |
+          printf '%s' "$RESULT_JSON" |
+            jq --arg channel "$PAR_SLACK_CHANNEL_ID" '{channel: $channel, text: .notificationSummary}' > slack.json
+          response=$(curl -sS https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data @slack.json) || response='{"ok":false,"error":"request_failed"}'
+          if printf '%s' "$response" | jq -e '.ok == true' > /dev/null; then
+            printf '## Slack\n\nSent.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            error=$(printf '%s' "$response" | jq -r '.error // "unknown_error"')
+            printf '## Slack\n\nFailed: %s.\n' "$error" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Slack alert failed: $error"
+            exit 1
+          fi
+
+  publish:
+    name: Publish attention result
+    needs: [evidence, classify, finalize]
+    # Publish even when AI failed. Alerts can only send a published result.
+    if: always() && needs.finalize.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Check out trusted publication code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install reviewed npm router (set the exact published version first)
+        run: npm install --ignore-scripts --no-audit --prefix "$RUNNER_TEMP/par-tool" @p3sg/pr-attention-router@REPLACE_WITH_REVIEWED_VERSION
+
+      - name: Prepare bounded publication evidence
+        env:
+          RESULT_JSON: ${{ needs.finalize.outputs.result }}
+          EVIDENCE_JSON: ${{ needs.evidence.outputs.evidence }}
+          AI_OUTPUT: ${{ needs.classify.outputs.ai }}
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          mkdir -p .par
+          node "$PAR_ROUTER/publish-record.js"
+
+      - name: Retain publication provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: par-result-${{ github.event.workflow_run.pull_requests[0].number }}-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}
+          path: .par/classification.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Create or update the PR comment
+        id: comment
+        uses: actions/github-script@v8
+        env:
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          COMMENT_ID: ${{ needs.finalize.outputs.comment-id }}
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: Number(process.env.PAR_PR_NUMBER),
+            });
+            if (pr.head.sha !== process.env.EXPECTED_HEAD_SHA) {
+              throw new Error('PR changed before publication. Wait for the next verified commit.');
+            }
+            const comment = require('node:fs').readFileSync('.par/comment.md', 'utf8');
+            if (process.env.COMMENT_ID) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: Number(process.env.COMMENT_ID),
+                body: comment,
+              });
+              core.setOutput('action', 'updated');
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: Number(process.env.PAR_PR_NUMBER),
+                body: comment,
+              });
+              core.setOutput('action', 'created');
+            }
+
+      - name: Summarize the attention result
+        env:
+          RESULT_JSON: ${{ needs.finalize.outputs.result }}
+          COMMENT_ACTION: ${{ steps.comment.outputs.action }}
+        run: |
+          {
+            printf '%s' "$RESULT_JSON" | jq -r '
+              "## PR attention result",
+              "",
+              "- **Final tier:** \(.finalTier)",
+              "- **Reviewer:** \(.reviewer)",
+              "- **AI used:** \(.aiUsed)",
+              "- **AI text withheld:** \(.aiTextWithheld)",
+              "- **Deterministic floor:** \(.deterministicFloor)",
+              (if (.floorReasons | length) == 0 then "  - No deterministic signals." else (.floorReasons[] | "  - \(.)") end)'
+            echo "- **Comment:** ${COMMENT_ACTION:-not published}"
+            echo '- Channel delivery outcomes appear in their separate notification jobs.'
+          } >> "$GITHUB_STEP_SUMMARY"
