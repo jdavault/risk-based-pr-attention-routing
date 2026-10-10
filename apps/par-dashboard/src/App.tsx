@@ -74,8 +74,8 @@ export function App(): ReactElement {
           <h1>PR Attention Router</h1>
           <p className={styles.tagline}>Route attention first; automate later.</p>
           <p className={styles.intro}>
-            Direct human review toward the changes with the greatest probability,
-            impact, difficulty of detection, and blast radius.
+            Direct human review toward changes with greater probability of
+            failure, higher impact, weaker detection, or broader blast radius.
           </p>
         </div>
 
