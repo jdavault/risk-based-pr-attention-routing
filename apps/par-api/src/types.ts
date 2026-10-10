@@ -1,4 +1,4 @@
-import type { Publication } from '@scope/pr-attention-router/publication.ts';
+import type { Publication } from '@p3sg/pr-attention-router/publication';
 export interface PullView {
   number: number; title: string; repository: string; url: string; headSha: string; draft: boolean;
   checks: string;

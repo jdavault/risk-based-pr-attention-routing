@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { zipSync, strToU8 } from 'fflate';
-import { publicationMarker, type Publication } from '@scope/pr-attention-router/publication.ts';
+import { publicationMarker, type Publication } from '@p3sg/pr-attention-router/publication';
 import { GitHubReader } from '../src/github.ts';
 import { loadConfig } from '../src/config.ts';
 

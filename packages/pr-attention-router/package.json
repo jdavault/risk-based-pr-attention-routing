@@ -1,19 +1,49 @@
 {
-  "name": "@scope/pr-attention-router",
+  "name": "@p3sg/pr-attention-router",
   "version": "0.2.0",
-  "private": true,
+  "license": "UNLICENSED",
   "description": "Classification-only PR attention router: coded floors plus a host rubric applied by AI.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/p3sg/risk-based-pr-attention-routing.git",
+    "directory": "packages/pr-attention-router"
+  },
+  "homepage": "https://github.com/p3sg/risk-based-pr-attention-routing/tree/main/packages/pr-attention-router#readme",
+  "bugs": {
+    "url": "https://github.com/p3sg/risk-based-pr-attention-routing/issues"
+  },
   "type": "module",
   "files": [
-    "route.ts",
-    "classification-prompt.md",
-    "classification.schema.json",
-    "README.md"
+    "README.md",
+    "dist/route.js",
+    "dist/route.d.ts",
+    "dist/context.js",
+    "dist/context.d.ts",
+    "dist/publication.js",
+    "dist/publication.d.ts",
+    "dist/publish-record.js",
+    "dist/publish-record.d.ts",
+    "dist/classification-prompt.md",
+    "dist/classification.schema.json",
+    "dist/examples/config/rubric.md",
+    "dist/examples/config/rules.json",
+    "dist/examples/github-action/README.md",
+    "dist/examples/github-action/pr-attention-review.yml"
   ],
+  "main": "./dist/route.js",
+  "types": "./dist/route.d.ts",
+  "exports": {
+    ".": { "types": "./dist/route.d.ts", "default": "./dist/route.js" },
+    "./publication": { "types": "./dist/publication.d.ts", "default": "./dist/publication.js" }
+  },
+  "bin": { "pr-attention-router": "./dist/route.js" },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24"
   },
   "scripts": {
+    "build": "node clean.mjs && tsc -p tsconfig.build.json && node build.mjs",
+    "package-smoke": "node package-smoke.mjs",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit --pretty false",
     "test": "node --test *.test.ts"
   },

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { unzipSync } from 'fflate';
-import { parsePublication, readPublication, publicationLimit, type Publication } from '@scope/pr-attention-router/publication.ts';
+import { parsePublication, readPublication, publicationLimit, type Publication } from '@p3sg/pr-attention-router/publication';
 import type { Config } from './config.ts';
 import type { PullView, Queue } from './types.ts';
 
