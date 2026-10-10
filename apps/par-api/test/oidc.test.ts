@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
+import { beginOwnerSetup, setupRedirect } from '../src/owner-setup.ts';
 
 const config = loadConfig({ PAR_ORIGIN: 'https://demo.example', PAR_REPOSITORIES: 'p3/reference', PAR_GITHUB_TOKEN: 'github-secret',
   PAR_SESSION_SECRET: 'b'.repeat(64), PAR_OIDC_ISSUER: 'https://accounts.google.com', PAR_OIDC_CLIENT_ID: 'p3-client',
@@ -16,13 +17,16 @@ async function setup(overrides: Record<string, unknown> = {}) {
     if (url.endsWith('/.well-known/openid-configuration')) return Response.json({ issuer: config.issuer,
       authorization_endpoint: `${config.issuer}/authorize`, token_endpoint: `${config.issuer}/token`, jwks_uri: `${config.issuer}/jwks`,
       response_types_supported: ['code'], subject_types_supported: ['public'], id_token_signing_alg_values_supported: ['RS256'],
-      token_endpoint_auth_methods_supported: ['client_secret_basic'] });
+      token_endpoint_auth_methods_supported: ['client_secret_post'] });
     if (url.endsWith('/jwks')) return Response.json({ keys: [jwk] });
     assert.equal(url, `${config.issuer}/token`); grants++;
     const body = new URLSearchParams(String(init?.body));
     assert.equal(body.get('redirect_uri'), `${config.origin}/api/auth/callback`);
     assert.ok((body.get('code_verifier') ?? '').length >= 43);
-    assert.match(new Headers(init?.headers).get('authorization') ?? '', /^Basic /u);
+    // Google rejects RFC 6749 Basic encoding of "-" and "." in client IDs, so credentials go in the body.
+    assert.equal(new Headers(init?.headers).get('authorization'), null);
+    assert.equal(body.get('client_id'), config.clientId);
+    assert.equal(body.get('client_secret'), config.clientSecret);
     const claims = { iss: config.issuer, sub: config.subject, aud: config.clientId, nonce,
       exp: Math.floor(Date.now() / 1000) + 300, iat: Math.floor(Date.now() / 1000), ...overrides };
     const idToken = await new SignJWT(claims).setProtectedHeader({ alg: 'RS256', kid: 'test-key' }).sign(privateKey);
@@ -64,4 +68,64 @@ test('wrong owner cannot authorize even with matching email/domain; invalid nonc
     assert.ok([401, 403].includes(response.status));
     assert.equal(response.headers.has('set-cookie'), false);
   }
+});
+
+test('local owner setup posts credentials and returns only the verified identity once', async () => {
+  const issuer = 'https://issuer.example';
+  const { privateKey, publicKey } = await generateKeyPair('RS256');
+  const jwk = { ...await exportJWK(publicKey), kid: 'owner-key', use: 'sig', alg: 'RS256' };
+  let nonce = ''; let grants = 0;
+  const transport: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/.well-known/openid-configuration')) return Response.json({ issuer,
+      authorization_endpoint: `${issuer}/authorize`, token_endpoint: `${issuer}/token`, jwks_uri: `${issuer}/jwks`,
+      response_types_supported: ['code'], subject_types_supported: ['public'], id_token_signing_alg_values_supported: ['RS256'],
+      token_endpoint_auth_methods_supported: ['client_secret_post'] });
+    if (url.endsWith('/jwks')) return Response.json({ keys: [jwk] });
+    assert.equal(url, `${issuer}/token`); grants++;
+    const body = new URLSearchParams(String(init?.body));
+    assert.equal(new Headers(init?.headers).get('authorization'), null);
+    assert.equal(body.get('client_id'), 'owner-client');
+    assert.equal(body.get('client_secret'), 'owner-secret');
+    assert.equal(body.get('redirect_uri'), setupRedirect);
+    assert.ok((body.get('code_verifier') ?? '').length >= 43);
+    const idToken = await new SignJWT({ nonce }).setProtectedHeader({ alg: 'RS256', kid: 'owner-key' })
+      .setIssuer(issuer).setSubject('validated-owner').setAudience('owner-client')
+      .setIssuedAt().setExpirationTime('5m').sign(privateKey);
+    return Response.json({ access_token: 'provider-secret', token_type: 'Bearer', expires_in: 300, id_token: idToken });
+  };
+  const owner = await beginOwnerSetup({ issuer, clientId: 'owner-client', clientSecret: 'owner-secret' }, transport);
+  assert.equal(owner.url.searchParams.get('code_challenge_method'), 'S256');
+  nonce = owner.url.searchParams.get('nonce')!;
+  const callback = new URL(`${setupRedirect}?code=provider-code`);
+  callback.searchParams.set('state', owner.url.searchParams.get('state')!);
+  assert.deepEqual(await owner.complete(callback), { issuer, subject: 'validated-owner' });
+  assert.equal(grants, 1);
+  await assert.rejects(owner.complete(callback), /Invalid setup callback/u);
+});
+
+test('local owner setup rejects the wrong callback and expiry before token exchange', async () => {
+  const issuer = 'https://issuer.example'; let grants = 0;
+  const transport: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/.well-known/openid-configuration')) return Response.json({ issuer,
+      authorization_endpoint: `${issuer}/authorize`, token_endpoint: `${issuer}/token`, jwks_uri: `${issuer}/jwks`,
+      response_types_supported: ['code'], subject_types_supported: ['public'], id_token_signing_alg_values_supported: ['RS256'],
+      token_endpoint_auth_methods_supported: ['client_secret_post'] });
+    grants++; throw new Error('Token exchange must not run.');
+  };
+  const now = Date.now();
+  const owner = await beginOwnerSetup({ issuer, clientId: 'owner-client', clientSecret: 'owner-secret' }, transport);
+  const state = owner.url.searchParams.get('state')!;
+  await assert.rejects(owner.complete(new URL(`http://127.0.0.1:3002/callback?code=x&state=${state}`)), /Invalid setup callback/u);
+  await assert.rejects(owner.complete(new URL(`http://localhost:3002/wrong?code=x&state=${state}`)), /Invalid setup callback/u);
+  await assert.rejects(owner.complete(new URL(`${setupRedirect}?code=x&state=wrong`)), /Invalid setup callback/u);
+  const originalNow = Date.now;
+  Date.now = () => now + 301_000;
+  try {
+    await assert.rejects(owner.complete(new URL(`${setupRedirect}?code=x&state=${state}`)), /Invalid setup callback/u);
+  } finally {
+    Date.now = originalNow;
+  }
+  assert.equal(grants, 0);
 });

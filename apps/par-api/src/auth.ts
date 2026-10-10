@@ -28,7 +28,7 @@ export async function hasSession(request: Request, config: Config): Promise<bool
 export function createAuth(config: Config, transport: typeof fetch = fetch) {
   let configuration: Promise<oidc.Configuration> | undefined;
   function client() {
-    configuration ??= oidc.discovery(new URL(config.issuer), config.clientId, config.clientSecret, oidc.ClientSecretBasic(config.clientSecret),
+    configuration ??= oidc.discovery(new URL(config.issuer), config.clientId, config.clientSecret, oidc.ClientSecretPost(config.clientSecret),
       { [oidc.customFetch]: (url, options) => transport(url, { ...options,
         body: options.body instanceof Uint8Array ? new Uint8Array(options.body) : options.body,
         signal: AbortSignal.timeout(10_000) }) })
