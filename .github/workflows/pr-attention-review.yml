@@ -9,7 +9,7 @@
 # Actions graph:
 #
 #   Collect trusted evidence -> Classify with Codex -> Finalize attention result
-#     -> Notify email + Notify Slack -> Publish attention result
+#     -> Publish attention result -> Notify email + Notify Slack
 #
 # Trust model: workflow_run always loads this file from the default branch,
 # and every job that needs code checks the router and host config out at
@@ -301,7 +301,7 @@ jobs:
 
   notify-email:
     name: Notify email
-    needs: finalize
+    needs: [finalize, publish]
     if: needs.finalize.outputs.should-notify == 'true' && vars.PAR_EMAIL_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -353,7 +353,7 @@ jobs:
 
   notify-slack:
     name: Notify Slack
-    needs: finalize
+    needs: [finalize, publish]
     if: needs.finalize.outputs.should-notify == 'true' && vars.PAR_SLACK_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -385,27 +385,62 @@ jobs:
 
   publish:
     name: Publish attention result
-    needs: [finalize, notify-email, notify-slack]
-    # Runs after both notifications whether they succeeded, failed, or were
-    # skipped; only a failed Finalize stops it.
+    needs: [evidence, classify, finalize]
+    # Publish even when AI failed. Alerts can only send a published result.
     if: always() && needs.finalize.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
       issues: write
       pull-requests: write
 
     steps:
+      - name: Check out trusted publication code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Prepare bounded publication evidence
+        env:
+          RESULT_JSON: ${{ needs.finalize.outputs.result }}
+          EVIDENCE_JSON: ${{ needs.evidence.outputs.evidence }}
+          AI_OUTPUT: ${{ needs.classify.outputs.ai }}
+          PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          mkdir -p .par
+          node "$PAR_ROUTER/publish-record.ts"
+
+      - name: Retain publication provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: par-result-${{ github.event.workflow_run.pull_requests[0].number }}-${{ github.event.workflow_run.head_sha }}-${{ github.run_attempt }}
+          path: .par/classification.json
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Create or update the PR comment
         id: comment
         uses: actions/github-script@v8
         env:
           PAR_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
           COMMENT_ID: ${{ needs.finalize.outputs.comment-id }}
-          RESULT_JSON: ${{ needs.finalize.outputs.result }}
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         with:
           script: |
-            const { comment } = JSON.parse(process.env.RESULT_JSON);
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: Number(process.env.PAR_PR_NUMBER),
+            });
+            if (pr.head.sha !== process.env.EXPECTED_HEAD_SHA) {
+              throw new Error('PR changed before publication. Wait for the next verified commit.');
+            }
+            const comment = require('node:fs').readFileSync('.par/comment.md', 'utf8');
             if (process.env.COMMENT_ID) {
               await github.rest.issues.updateComment({
                 ...context.repo,
@@ -426,24 +461,7 @@ jobs:
         env:
           RESULT_JSON: ${{ needs.finalize.outputs.result }}
           COMMENT_ACTION: ${{ steps.comment.outputs.action }}
-          SHOULD_NOTIFY: ${{ needs.finalize.outputs.should-notify }}
-          EMAIL_RESULT: ${{ needs.notify-email.result }}
-          EMAIL_ENABLED: ${{ vars.PAR_EMAIL_ENABLED }}
-          SLACK_RESULT: ${{ needs.notify-slack.result }}
-          SLACK_ENABLED: ${{ vars.PAR_SLACK_ENABLED }}
         run: |
-          outcome() {
-            case "$1" in
-              success) echo 'sent' ;;
-              failure) echo 'failed' ;;
-              cancelled) echo 'cancelled' ;;
-              skipped)
-                if [ "$SHOULD_NOTIFY" != true ]; then echo 'skipped (tier unchanged)'
-                elif [ "$2" != true ]; then echo 'skipped (disabled)'
-                else echo 'skipped'; fi ;;
-              *) echo "$1" ;;
-            esac
-          }
           {
             printf '%s' "$RESULT_JSON" | jq -r '
               "## PR attention result",
@@ -455,6 +473,5 @@ jobs:
               "- **Deterministic floor:** \(.deterministicFloor)",
               (if (.floorReasons | length) == 0 then "  - No deterministic signals." else (.floorReasons[] | "  - \(.)") end)'
             echo "- **Comment:** ${COMMENT_ACTION:-not published}"
-            echo "- **Email:** $(outcome "$EMAIL_RESULT" "$EMAIL_ENABLED")"
-            echo "- **Slack:** $(outcome "$SLACK_RESULT" "$SLACK_ENABLED")"
+            echo '- Channel delivery outcomes appear in their separate notification jobs.'
           } >> "$GITHUB_STEP_SUMMARY"
